@@ -17,9 +17,10 @@ import java.util.HashMap;
 import java.util.UUID;
 
 public class AcrobaticsListener implements Listener {
-    private NMLAcrobatics nmlAcrobatics;
-    private SkillSetManager skillSetManager;
+    private final NMLAcrobatics nmlAcrobatics;
+    private final SkillSetManager skillSetManager;
     private static final HashMap<UUID, Long> lastSneakToggle = new HashMap<>();
+    private final HashMap<UUID, Boolean> wasOnGround = new HashMap<>();
     private static final long inputThreshold = 300;
 
     public AcrobaticsListener(NMLAcrobatics nmlAcrobatics) {
@@ -31,7 +32,7 @@ public class AcrobaticsListener implements Listener {
     public void setRollDirection(PlayerMoveEvent event) {
         Vector move = event.getTo().toVector().subtract(event.getFrom().toVector());
 
-        if (move.lengthSquared() > 0.001) Manuevers.setRollDirection(event.getPlayer(), move);
+        if (move.lengthSquared() > 0.001) Maneuvers.setRollDirection(event.getPlayer(), move);
     }
 
     @EventHandler
@@ -44,7 +45,7 @@ public class AcrobaticsListener implements Listener {
 
         if (now - lastTime <= inputThreshold && (!player.hasMetadata("roll cooldown") && !player.hasMetadata("roll brace"))) {
             if (player.isOnGround()) {
-                Manuevers.roll(player);
+                Maneuvers.roll(player);
                 CooldownManager.putAllAbilitiesOnCooldown(player, 1.5);
                 player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
 
@@ -80,11 +81,11 @@ public class AcrobaticsListener implements Listener {
     }
 
     @EventHandler
-    public void actualRollBrace(EntityDamageEvent event) { // actual roll brace
+    public void actualRollBrace(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player player && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
             if (player.hasMetadata("roll brace")) {
                 event.setDamage(event.getDamage() / 2);
-                Manuevers.rollBrace(player);
+                Maneuvers.rollBrace(player);
                 CooldownManager.putAllAbilitiesOnCooldown(player, 1.5);
                 player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
 
@@ -94,6 +95,45 @@ public class AcrobaticsListener implements Listener {
                         player.removeMetadata("roll cooldown", nmlAcrobatics);
                     }
                 }.runTaskLater(nmlAcrobatics, 30);
+            }
+        }
+    }
+
+    @EventHandler
+    public void longJumpMetadata(PlayerToggleSneakEvent event) {
+        Player player = event.getPlayer();
+        int acrobaticsLvl = skillSetManager.getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
+
+        if (!event.isSneaking()) return;
+        if (acrobaticsLvl < 10) return;
+
+        if (player.isSprinting()) {
+            player.setMetadata("start longjump", new FixedMetadataValue(nmlAcrobatics, true));
+
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    player.removeMetadata("start longjump", nmlAcrobatics);
+                }
+            }.runTaskLater(nmlAcrobatics, 5L);
+        }
+    }
+
+    @EventHandler
+    public void actualLongJump(PlayerMoveEvent event) {
+        Player player = event.getPlayer();
+        boolean lastGround = wasOnGround.getOrDefault(player.getUniqueId(), player.isOnGround());
+        boolean nowGround  = player.isOnGround();
+
+        wasOnGround.put(player.getUniqueId(), nowGround);
+
+        if (lastGround && !nowGround) {
+            boolean vertical = (event.getTo().getY() - event.getFrom().getY()) > 0;
+            boolean velocityCheck = player.getVelocity().getY() > .2; // velocity check helps catch the actual jump (vanilla jump ~0.42)
+
+            if ((vertical || velocityCheck ) && player.hasMetadata("start longjump")) {
+                player.removeMetadata("start longjump", nmlAcrobatics);
+                Maneuvers.longJump(player);
             }
         }
     }

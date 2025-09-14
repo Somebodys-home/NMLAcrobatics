@@ -14,6 +14,8 @@ public final class NMLAcrobatics extends JavaPlugin {
         nmlSkills = JavaPlugin.getPlugin(NMLSkills.class);
         skillSetManager = nmlSkills.getSkillSetManager();
 
+        new Maneuvers(this);
+
         getServer().getPluginManager().registerEvents(new AcrobaticsListener(this), this);
     }
 
