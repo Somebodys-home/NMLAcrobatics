@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.player.PlayerInputEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.metadata.FixedMetadataValue;
@@ -20,7 +21,6 @@ public class AcrobaticsListener implements Listener {
     private final NMLAcrobatics nmlAcrobatics;
     private final SkillSetManager skillSetManager;
     private static final HashMap<UUID, Long> lastSneakToggle = new HashMap<>();
-    private final HashMap<UUID, Boolean> wasOnGround = new HashMap<>();
     private static final long inputThreshold = 300;
 
     public AcrobaticsListener(NMLAcrobatics nmlAcrobatics) {
@@ -120,20 +120,25 @@ public class AcrobaticsListener implements Listener {
     }
 
     @EventHandler
-    public void actualLongJump(PlayerMoveEvent event) {
+    public void actualLongJump(PlayerInputEvent event) {
         Player player = event.getPlayer();
-        boolean lastGround = wasOnGround.getOrDefault(player.getUniqueId(), player.isOnGround());
-        boolean nowGround  = player.isOnGround();
 
-        wasOnGround.put(player.getUniqueId(), nowGround);
+        if (event.getInput().isJump() && player.hasMetadata("start longjump")) {
+            player.removeMetadata("start longjump", nmlAcrobatics);
+            Maneuvers.longJump(player);
+        }
+    }
 
-        if (lastGround && !nowGround) {
-            boolean vertical = (event.getTo().getY() - event.getFrom().getY()) > 0;
-            boolean velocityCheck = player.getVelocity().getY() > .2; // velocity check helps catch the actual jump (vanilla jump ~0.42)
+    @EventHandler
+    public void getOffGrinding(PlayerInputEvent event) {
+        Player player = event.getPlayer();
 
-            if ((vertical || velocityCheck ) && player.hasMetadata("start longjump")) {
-                player.removeMetadata("start longjump", nmlAcrobatics);
-                Maneuvers.longJump(player);
+        if (player.hasMetadata("rail grind")) {
+            if (event.getInput().isJump()) {
+                player.removeMetadata("rail grind", nmlAcrobatics);
+                Maneuvers.railJump(player, player.getVelocity().length());
+            } else if (event.getInput().isSneak()) {
+                player.removeMetadata("rail grind", nmlAcrobatics);
             }
         }
     }
