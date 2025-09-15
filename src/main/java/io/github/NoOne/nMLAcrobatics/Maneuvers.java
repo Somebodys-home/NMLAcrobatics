@@ -1,5 +1,6 @@
 package io.github.NoOne.nMLAcrobatics;
 
+import io.github.NoOne.nMLEnergySystem.EnergyManager;
 import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
 import org.bukkit.*;
 import org.bukkit.block.Block;
@@ -75,7 +76,7 @@ public class Maneuvers {
                                 velocity = new Vector(-0.5, 0, 0);
                             }
 
-                            if (newDirection != null && !newDirection.equals(priorDirection) && tickCounter - lastChangeTick >= 5) {
+                            if (newDirection != null && !newDirection.equals(priorDirection) && tickCounter - lastChangeTick >= 20) {
                                 centerPlayer(player);
                                 lastSuccessfulRailGrindDirection.put(uuid, newDirection);
                                 lastDirectionChangeTick.put(uuid, tickCounter); // reset cooldown
@@ -86,7 +87,7 @@ public class Maneuvers {
                                 player.setVelocity(velocity);
                             }
 
-                            railGrindSpeed.put(uuid, speed * .97);
+                            railGrindSpeed.put(uuid, speed * .98);
 
                         } else {
                             player.removeMetadata("rail grind", nmlAcrobatics);
@@ -112,6 +113,7 @@ public class Maneuvers {
 
         player.setVelocity(roll);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+        EnergyManager.useEnergy(player, 5);
     }
 
     public static void rollBrace(Player player) {
@@ -126,6 +128,7 @@ public class Maneuvers {
         double speed = longJump.length();
 
         player.setVelocity(longJump);
+        EnergyManager.useEnergy(player, 10);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
         player.setMetadata("longjump", new FixedMetadataValue(nmlAcrobatics, true));
 
@@ -171,6 +174,7 @@ public class Maneuvers {
         double speed2 = railJump.length();
 
         player.setVelocity(railJump);
+        EnergyManager.useEnergy(player, 10);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
         player.setMetadata("longjump", new FixedMetadataValue(nmlAcrobatics, true));
 

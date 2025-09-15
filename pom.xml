@@ -88,5 +88,11 @@
             <version>bda63e9b3b</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>com.github.Somebodys-home</groupId>
+            <artifactId>NMLEnergySystem</artifactId>
+            <version>4dd6002d90</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 </project>
