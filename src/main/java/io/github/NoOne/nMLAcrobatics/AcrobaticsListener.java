@@ -32,13 +32,6 @@ public class AcrobaticsListener implements Listener {
     }
 
     @EventHandler
-    public void setRollDirection(PlayerMoveEvent event) {
-        Vector move = event.getTo().toVector().subtract(event.getFrom().toVector());
-
-        if (move.lengthSquared() > 0.001) Maneuvers.setRollDirection(event.getPlayer(), move);
-    }
-
-    @EventHandler
     public void roll(PlayerToggleSneakEvent event) {
         if (!event.isSneaking()) return;
 
@@ -49,15 +42,6 @@ public class AcrobaticsListener implements Listener {
         if (now - lastTime <= inputThreshold && (!player.hasMetadata("roll cooldown") && !player.hasMetadata("roll brace"))) {
             if (player.isOnGround()) {
                 Maneuvers.roll(player);
-                CooldownManager.putAllAbilitiesOnCooldown(player, 1.5);
-                player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
-
-                new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        player.removeMetadata("roll cooldown", nmlAcrobatics);
-                    }
-                }.runTaskLater(nmlAcrobatics, 30);
             } else {
                 player.setMetadata("roll brace", new FixedMetadataValue(nmlAcrobatics, true));
                 player.playSound(player, Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1f);

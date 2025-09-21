@@ -1,5 +1,6 @@
 package io.github.NoOne.nMLAcrobatics;
 
+import io.github.Gabriel.expertiseStylePlugin.AbilitySystem.CooldownSystem.CooldownManager;
 import io.github.NoOne.nMLEnergySystem.EnergyManager;
 import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
 import org.bukkit.*;
@@ -18,7 +19,9 @@ public class Maneuvers {
     private static NMLAcrobatics nmlAcrobatics;
     private final SkillSetManager skillSetManager;
     private BukkitTask railGrindTask;
-    private static final HashMap<UUID, Vector> rollDirection = new HashMap<>();
+    private BukkitTask rollTask;
+    private static final HashMap<UUID, Location> lastLocations = new HashMap<>();
+    private static final HashMap<UUID, Location> currentLocations = new HashMap<>();
     private static final HashMap<UUID, Vector> railGrindDirection = new HashMap<>();
     private static final HashMap<UUID, Double> railGrindSpeed = new HashMap<>();
     private static final HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
@@ -103,20 +106,52 @@ public class Maneuvers {
         }.runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
-    public void stopRailGrindTask() {
+    public void startRollTask() {
+        rollTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    UUID id = player.getUniqueId();
+
+                    if (currentLocations.containsKey(id)) lastLocations.put(id, currentLocations.get(id));
+
+                    currentLocations.put(id, player.getLocation().clone());
+                }
+            }
+        }.runTaskTimer(nmlAcrobatics, 0, 2);
+    }
+
+    public void stopTasks() {
         railGrindTask.cancel();
+        rollTask.cancel();
     }
 
     public static void roll(Player player) {
-        Vector direction = rollDirection.get(player.getUniqueId());
+        UUID id = player.getUniqueId();
+        Location last = lastLocations.get(id);
+        Location now = currentLocations.get(id);
 
-        if (direction == null && direction.lengthSquared() < 0.0001) return;
+        if (last == null || now == null) return;
 
-        Vector roll = direction.normalize().multiply(2);
+        Vector movement = now.toVector().subtract(last.toVector());
 
-        player.setVelocity(roll);
-        player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-        EnergyManager.useEnergy(player, 5);
+        if (movement.lengthSquared() > 0.01) {
+            Vector roll = movement.normalize().multiply(2);
+            roll.setY(player.getVelocity().getY()); // keep vertical motion
+            player.setVelocity(roll);
+
+            player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+            EnergyManager.useEnergy(player, 5);
+            CooldownManager.putAllAbilitiesOnCooldown(player, 1.5);
+            player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
+
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    player.removeMetadata("roll cooldown", nmlAcrobatics);
+                }
+            }.runTaskLater(nmlAcrobatics, 30);
+        }
     }
 
     public static void rollBrace(Player player) {
@@ -129,7 +164,6 @@ public class Maneuvers {
     public static void longJump(Player player) {
         Vector longJump = player.getLocation().getDirection().normalize().multiply(1.2).setY(.5);
         double speed = longJump.length();
-//        double speed = .5;
 
         player.setVelocity(longJump);
         EnergyManager.useEnergy(player, 10);
@@ -214,10 +248,6 @@ public class Maneuvers {
                 }
             }
         }.runTaskTimer(nmlAcrobatics, 5, 1);
-    }
-
-    public static void setRollDirection(Player player, Vector direction) {
-        rollDirection.put(player.getUniqueId(), direction);
     }
 
     private static boolean isGrindable(Block block) {

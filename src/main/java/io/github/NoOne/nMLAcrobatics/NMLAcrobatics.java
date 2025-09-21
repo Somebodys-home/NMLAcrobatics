@@ -16,6 +16,7 @@ public final class NMLAcrobatics extends JavaPlugin {
 
         maneuvers = new Maneuvers(this);
         maneuvers.startRailGrindTask();
+        maneuvers.startRollTask();
 
 
         getServer().getPluginManager().registerEvents(new AcrobaticsListener(this), this);
@@ -23,7 +24,7 @@ public final class NMLAcrobatics extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        maneuvers.stopRailGrindTask();
+        maneuvers.stopTasks();
     }
 
     public NMLSkills getNmlSkills() {
