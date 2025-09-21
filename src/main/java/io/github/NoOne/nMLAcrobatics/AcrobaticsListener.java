@@ -1,8 +1,11 @@
 package io.github.NoOne.nMLAcrobatics;
 
+import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import io.github.Gabriel.expertiseStylePlugin.AbilitySystem.CooldownSystem.CooldownManager;
 import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
+import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -120,10 +123,10 @@ public class AcrobaticsListener implements Listener {
     }
 
     @EventHandler
-    public void actualLongJump(PlayerInputEvent event) {
+    public void actualLongJump(PlayerJumpEvent event) {
         Player player = event.getPlayer();
 
-        if (event.getInput().isJump() && player.hasMetadata("start longjump")) {
+        if (player.hasMetadata("start longjump")) {
             player.removeMetadata("start longjump", nmlAcrobatics);
             Maneuvers.longJump(player);
         }

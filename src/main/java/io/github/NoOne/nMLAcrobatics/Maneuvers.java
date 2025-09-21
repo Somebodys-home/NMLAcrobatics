@@ -22,7 +22,7 @@ public class Maneuvers {
     private static final HashMap<UUID, Vector> railGrindDirection = new HashMap<>();
     private static final HashMap<UUID, Double> railGrindSpeed = new HashMap<>();
     private static final HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
-    private static final HashMap<UUID, Integer> lastDirectionChangeTick = new HashMap<>();
+    private static final HashMap<UUID, Location> lastDirectionChangeLocation = new HashMap<>();
 
     public Maneuvers(NMLAcrobatics nmlAcrobatics) {
         Maneuvers.nmlAcrobatics = nmlAcrobatics;
@@ -45,8 +45,8 @@ public class Maneuvers {
                         Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
                         if (isGrindable(below)) {
                             String priorDirection = lastSuccessfulRailGrindDirection.get(uuid);
-                            int lastChangeTick = lastDirectionChangeTick.getOrDefault(uuid, -10);
                             double speed = railGrindSpeed.get(uuid);
+                            boolean ableToSwitchDirection = true;
                             String newDirection = null;
                             Vector velocity = null;
 
@@ -56,44 +56,47 @@ public class Maneuvers {
                             Block southBlock = base.getRelative(BlockFace.SOUTH).getRelative(BlockFace.DOWN);
                             Block westBlock  = base.getRelative(BlockFace.WEST).getRelative(BlockFace.DOWN);
 
-                            if (speed < .1) {
-                                player.removeMetadata("rail grind", nmlAcrobatics);
-                                lastSuccessfulRailGrindDirection.remove(uuid);
-                                lastDirectionChangeTick.remove(uuid);
+                            // boolean for if the player is more than 1 block away from the block where they last switched directions
+                            if (lastDirectionChangeLocation.get(uuid) != null && lastDirectionChangeLocation.get(uuid).distance(player.getLocation().getBlock().getLocation()) < 1) {
+                                ableToSwitchDirection = false;
                             }
 
-                            if (isGrindable(northBlock) && !"south".equals(priorDirection)) {
+                            // what direction to grind in / changing directions
+                            if (isGrindable(northBlock) && !"south".equals(priorDirection) && ableToSwitchDirection) {
                                 newDirection = "north";
                                 velocity = new Vector(0, 0, -0.5);
-                            } else if (isGrindable(eastBlock) && !"west".equals(priorDirection)) {
+                            }
+                            else if (isGrindable(eastBlock) && !"west".equals(priorDirection) && ableToSwitchDirection) {
                                 newDirection = "east";
                                 velocity = new Vector(0.5, 0, 0);
-                            } else if (isGrindable(southBlock) && !"north".equals(priorDirection)) {
+                            }
+                            else if (isGrindable(southBlock) && !"north".equals(priorDirection) && ableToSwitchDirection) {
                                 newDirection = "south";
                                 velocity = new Vector(0, 0, 0.5);
-                            } else if (isGrindable(westBlock) && !"east".equals(priorDirection)) {
+                            }
+                            else if (isGrindable(westBlock) && !"east".equals(priorDirection) && ableToSwitchDirection) {
                                 newDirection = "west";
                                 velocity = new Vector(-0.5, 0, 0);
                             }
 
-                            if (newDirection != null && !newDirection.equals(priorDirection) && tickCounter - lastChangeTick >= 20) {
-                                centerPlayer(player);
-                                lastSuccessfulRailGrindDirection.put(uuid, newDirection);
-                                lastDirectionChangeTick.put(uuid, tickCounter); // reset cooldown
+                            // if we've changed directions, save it
+                            if (newDirection != null && !newDirection.equals(priorDirection)) {
+                                centerPlayer(player); // center the player
+                                lastSuccessfulRailGrindDirection.put(uuid, newDirection); // save the direction we're now going in
+                                lastDirectionChangeLocation.put(uuid, player.getLocation().getBlock().getLocation()); // save the location of the block that we changed direction from
                             }
 
-                            if (velocity != null) {
-                                velocity.multiply(speed);
-                                player.setVelocity(velocity);
-                            }
-
-                            railGrindSpeed.put(uuid, speed * .98);
+                            // apply velocity, multiplied by speed, to player
+                            if (velocity != null) player.setVelocity(velocity.multiply(speed));
 
                         } else {
                             player.removeMetadata("rail grind", nmlAcrobatics);
-                            lastSuccessfulRailGrindDirection.remove(uuid);
-                            lastDirectionChangeTick.remove(uuid);
                         }
+                    } else if (!player.hasMetadata("rail grind")) {
+                        lastSuccessfulRailGrindDirection.remove(uuid);
+                        lastDirectionChangeLocation.remove(uuid);
+                        railGrindSpeed.remove(uuid);
+                        railGrindDirection.remove(uuid);
                     }
                 }
             }
@@ -124,8 +127,9 @@ public class Maneuvers {
     }
 
     public static void longJump(Player player) {
-        Vector longJump = player.getLocation().getDirection().normalize().multiply(1.5).setY(.5);
+        Vector longJump = player.getLocation().getDirection().normalize().multiply(1.2).setY(.5);
         double speed = longJump.length();
+//        double speed = .5;
 
         player.setVelocity(longJump);
         EnergyManager.useEnergy(player, 10);
@@ -177,6 +181,7 @@ public class Maneuvers {
         EnergyManager.useEnergy(player, 10);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
         player.setMetadata("longjump", new FixedMetadataValue(nmlAcrobatics, true));
+        player.removeMetadata("rail grind", nmlAcrobatics);
 
         new BukkitRunnable() {
             @Override
@@ -208,7 +213,7 @@ public class Maneuvers {
                     cancel();
                 }
             }
-        }.runTaskTimer(nmlAcrobatics, 0, 1);
+        }.runTaskTimer(nmlAcrobatics, 5, 1);
     }
 
     public static void setRollDirection(Player player, Vector direction) {
@@ -216,29 +221,25 @@ public class Maneuvers {
     }
 
     private static boolean isGrindable(Block block) {
-        if (block.getType() == Material.OAK_FENCE || block.getType() == Material.OAK_FENCE_GATE ||
-            block.getType() == Material.SPRUCE_FENCE || block.getType() == Material.SPRUCE_FENCE_GATE ||
-            block.getType() == Material.BIRCH_FENCE || block.getType() == Material.BIRCH_FENCE_GATE ||
-            block.getType() == Material.JUNGLE_FENCE || block.getType() == Material.JUNGLE_FENCE_GATE ||
-            block.getType() == Material.ACACIA_FENCE || block.getType() == Material.ACACIA_FENCE_GATE ||
-            block.getType() == Material.DARK_OAK_FENCE || block.getType() == Material.DARK_OAK_FENCE_GATE ||
-            block.getType() == Material.MANGROVE_FENCE || block.getType() == Material.MANGROVE_FENCE_GATE ||
-            block.getType() == Material.CHERRY_FENCE || block.getType() == Material.CHERRY_FENCE_GATE ||
-            block.getType() == Material.BAMBOO_FENCE || block.getType() == Material.BAMBOO_FENCE_GATE ||
-            block.getType() == Material.CRIMSON_FENCE || block.getType() == Material.CRIMSON_FENCE_GATE ||
-            block.getType() == Material.WARPED_FENCE || block.getType() == Material.WARPED_FENCE_GATE ||
-            block.getType() == Material.NETHER_BRICK_FENCE || block.getType() == Material.IRON_BARS) {
-
-            return true;
-        } else {
-            return false;
-        }
+        return block.getType() == Material.OAK_FENCE || block.getType() == Material.OAK_FENCE_GATE ||
+                block.getType() == Material.SPRUCE_FENCE || block.getType() == Material.SPRUCE_FENCE_GATE ||
+                block.getType() == Material.BIRCH_FENCE || block.getType() == Material.BIRCH_FENCE_GATE ||
+                block.getType() == Material.JUNGLE_FENCE || block.getType() == Material.JUNGLE_FENCE_GATE ||
+                block.getType() == Material.ACACIA_FENCE || block.getType() == Material.ACACIA_FENCE_GATE ||
+                block.getType() == Material.DARK_OAK_FENCE || block.getType() == Material.DARK_OAK_FENCE_GATE ||
+                block.getType() == Material.MANGROVE_FENCE || block.getType() == Material.MANGROVE_FENCE_GATE ||
+                block.getType() == Material.CHERRY_FENCE || block.getType() == Material.CHERRY_FENCE_GATE ||
+                block.getType() == Material.BAMBOO_FENCE || block.getType() == Material.BAMBOO_FENCE_GATE ||
+                block.getType() == Material.CRIMSON_FENCE || block.getType() == Material.CRIMSON_FENCE_GATE ||
+                block.getType() == Material.WARPED_FENCE || block.getType() == Material.WARPED_FENCE_GATE ||
+                block.getType() == Material.NETHER_BRICK_FENCE || block.getType() == Material.IRON_BARS;
     }
 
     private static void centerPlayer(Player player) {
         Location loc = player.getLocation();
         float yaw = player.getLocation().getYaw();
         float pitch = player.getLocation().getPitch();
+
         loc.setX(loc.getBlockX() + 0.5);
         loc.setY(loc.getBlockY()); // keep current Y
         loc.setZ(loc.getBlockZ() + 0.5);
