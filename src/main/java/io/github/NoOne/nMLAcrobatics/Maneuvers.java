@@ -7,12 +7,14 @@ import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pose;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public class Maneuvers {
@@ -137,13 +139,12 @@ public class Maneuvers {
 
         if (movement.lengthSquared() > 0.01) {
             Vector roll = movement.normalize().multiply(2);
-            roll.setY(player.getVelocity().getY()); // keep vertical motion
-            player.setVelocity(roll);
 
             player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
             EnergyManager.useEnergy(player, 5);
             CooldownManager.putAllAbilitiesOnCooldown(player, 1.5);
             player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
+            player.setVelocity(roll);
 
             new BukkitRunnable() {
                 @Override
