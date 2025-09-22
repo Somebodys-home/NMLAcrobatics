@@ -17,7 +17,7 @@ public final class NMLAcrobatics extends JavaPlugin {
         maneuvers = new Maneuvers(this);
         maneuvers.startRailGrindTask();
         maneuvers.startRollTask();
-
+        maneuvers.startClimbTask();
 
         getServer().getPluginManager().registerEvents(new AcrobaticsListener(this), this);
     }

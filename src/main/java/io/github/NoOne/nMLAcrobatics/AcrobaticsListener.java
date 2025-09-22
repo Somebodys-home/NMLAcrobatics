@@ -3,7 +3,7 @@ package io.github.NoOne.nMLAcrobatics;
 import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import io.github.Gabriel.expertiseStylePlugin.AbilitySystem.CooldownSystem.CooldownManager;
 import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
-import org.bukkit.Material;
+import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -42,7 +42,8 @@ public class AcrobaticsListener implements Listener {
         if (now - lastTime <= inputThreshold && (!player.hasMetadata("roll cooldown") && !player.hasMetadata("roll brace"))) {
             if (player.isOnGround()) {
                 Maneuvers.roll(player);
-            } else {
+            }
+            else { // roll brace
                 player.setMetadata("roll brace", new FixedMetadataValue(nmlAcrobatics, true));
                 player.playSound(player, Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1f);
             }
@@ -52,7 +53,7 @@ public class AcrobaticsListener implements Listener {
     }
 
     @EventHandler
-    public void rollBraceMetadata(PlayerMoveEvent event) { // remove roll brace metadata when hitting the ground
+    public void removeRollBraceMetadata(PlayerMoveEvent event) { // remove roll brace metadata when hitting the ground
         Player player = event.getPlayer();
 
         if (!player.hasMetadata("roll brace")) return;
@@ -68,7 +69,7 @@ public class AcrobaticsListener implements Listener {
     }
 
     @EventHandler
-    public void actualRollBrace(EntityDamageEvent event) {
+    public void actualRollBraceFromDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player player && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
             if (player.hasMetadata("roll brace")) {
                 event.setDamage(event.getDamage() / 2);
@@ -87,14 +88,35 @@ public class AcrobaticsListener implements Listener {
     }
 
     @EventHandler
-    public void longJumpMetadata(PlayerToggleSneakEvent event) {
+    public void shiftingMetadata(PlayerToggleSneakEvent event) {
         Player player = event.getPlayer();
         int acrobaticsLvl = skillSetManager.getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
 
         if (!event.isSneaking()) return;
-        if (acrobaticsLvl < 10) return;
 
-        if (player.isSprinting()) {
+        if (player.hasMetadata("climb")) {
+            player.setMetadata("start wall jump", new FixedMetadataValue(nmlAcrobatics, true));
+
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    player.removeMetadata("start wall jump", nmlAcrobatics);
+                }
+            }.runTaskLater(nmlAcrobatics, 5L);
+
+            return;
+        }
+        if (!Maneuvers.getBottomBlock(player).getType().isAir() && !Maneuvers.getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
+            player.setMetadata("start climb", new FixedMetadataValue(nmlAcrobatics, true));
+
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    player.removeMetadata("start climb", nmlAcrobatics);
+                }
+            }.runTaskLater(nmlAcrobatics, 5L);
+        }
+        else if (player.isSprinting() && acrobaticsLvl >= 10) {
             player.setMetadata("start longjump", new FixedMetadataValue(nmlAcrobatics, true));
 
             new BukkitRunnable() {
@@ -107,12 +129,16 @@ public class AcrobaticsListener implements Listener {
     }
 
     @EventHandler
-    public void actualLongJump(PlayerJumpEvent event) {
+    public void shiftJumpManeuver(PlayerJumpEvent event) {
         Player player = event.getPlayer();
 
         if (player.hasMetadata("start longjump")) {
             player.removeMetadata("start longjump", nmlAcrobatics);
             Maneuvers.longJump(player);
+        }
+        else if (player.hasMetadata("start climb")) {
+            player.removeMetadata("start climb", nmlAcrobatics);
+            Maneuvers.climb(player, true);
         }
     }
 
@@ -127,6 +153,16 @@ public class AcrobaticsListener implements Listener {
             } else if (event.getInput().isSneak()) {
                 player.removeMetadata("rail grind", nmlAcrobatics);
             }
+        }
+    }
+
+    @EventHandler
+    public void wallJump(PlayerInputEvent event) {
+        Player player = event.getPlayer();
+
+        if (event.getInput().isJump() && player.hasMetadata("start wall jump")) {
+            player.removeMetadata("start wall jump", nmlAcrobatics);
+            Maneuvers.wallJump(player);
         }
     }
 }
