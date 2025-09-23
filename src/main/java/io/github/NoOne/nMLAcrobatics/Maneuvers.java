@@ -11,6 +11,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.UUID;
 
@@ -25,7 +26,6 @@ public class Maneuvers {
     private static final HashMap<UUID, Double> railGrindSpeed = new HashMap<>();
     private static final HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
     private static final HashMap<UUID, Location> lastDirectionChangeLocation = new HashMap<>();
-    private static final HashMap<UUID, Location> startClimbBlockLocation = new HashMap<>();
     private static final HashMap<UUID, Vector> climbCardinals = new HashMap<>();
 
     public Maneuvers(NMLAcrobatics nmlAcrobatics) {
@@ -131,55 +131,68 @@ public class Maneuvers {
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (player.hasMetadata("climb")) {
-                        UUID uuid = player.getUniqueId();
-                        Vector climbCardinal = climbCardinals.get(uuid);
-
-                        if (climbCardinal == null) continue;
-
-                        Location startingLocation = startClimbBlockLocation.get(uuid);
-                        Location front = player.getLocation().add(climbCardinal).add(0, 1, 0);
-                        Block frontBlock = front.getBlock();
-                        Location aboveFront = player.getLocation().add(climbCardinal).add(0, 1, 0);
-                        Block aboveFrontBlock = aboveFront.clone().add(0, 1, 0).getBlock();
                         Location playerLocation = player.getLocation();
-                        Vector offset = playerLocation.toVector().subtract(startingLocation.toVector()); // Vector from wall to player
-                        double perpendicularDistance = offset.dot(climbCardinal);
+                        UUID uuid = player.getUniqueId();
+                        Vector climbCardinal = getClosestWallCardinal(player);
 
-                        offset.setY(0); // (horizontal only)
-
-                        // landing / running off
-                        if (player.isOnGround() || frontBlock.getType().isAir()) {
-                            stopClimbing(player);
+                        if (climbCardinal == null) {
+                            climbCardinal = climbCardinals.get(uuid);
                         }
+
+                        climbCardinals.put(uuid, climbCardinal);
+
+                        Location front = playerLocation.clone().add(climbCardinal).add(0, 1, 0);
+                        Location aboveFront = playerLocation.clone().add(climbCardinal).add(0, 1, 0);
+                        Block frontBlock = front.getBlock();
+                        Block aboveFrontBlock = aboveFront.clone().add(0, 1, 0).getBlock();
+                        Block moreAboveFrontBlock = aboveFront.clone().add(0, 2, 0).getBlock();
+
+                        Location wallFaceLoc = frontBlock.getLocation().add(0.5, 0.5, 0.5).toVector().subtract(climbCardinal.clone().multiply(0.5))
+                                                .toLocation(frontBlock.getWorld());
+                        Vector toPlayer = playerLocation.toVector().subtract(wallFaceLoc.toVector());
+                        double distanceFromWall = Math.abs(toPlayer.dot(climbCardinal));
+
+                        // running off wall / landing on the ground stops player from climbing
+                        if (player.isOnGround() || !hasNeighboringBlocks(wallFaceLoc)) stopClimbing(player);
 
                         // wall lock
-                        if (Math.abs(perpendicularDistance) >= .8) {
-                            Vector pushBack = climbCardinal.clone().multiply(-perpendicularDistance * 0.05);
-                            player.setVelocity(player.getVelocity().add(pushBack));
-                        }
-
-                        // pull-up
-                        if (frontBlock.getType().isSolid() && aboveFrontBlock.getType().isAir()) {
-                            stopClimbing(player);
-                            player.setVelocity(new Vector(0, 0.66, 0).add(climbCardinal.multiply(0.2)));
-                            player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+                        if (!isFalling(player) && distanceFromWall >= .7) { // max distance
+                            Vector pushBack = climbCardinal.clone().multiply(Math.pow(distanceFromWall, 2) / 25);
+                            player.setVelocity(pushBack);
 
                             new BukkitRunnable() {
                                 @Override
                                 public void run() {
-                                    player.setVelocity(player.getVelocity().add(climbCardinal.multiply(.3)));
+                                    player.setVelocity(player.getVelocity().add(pushBack));
+                                }
+                            }.runTaskLater(nmlAcrobatics, 1);
+                        }
+
+                        // pull-up
+                        if (frontBlock.getType().isSolid() && (aboveFrontBlock.getType().isAir() || !aboveFrontBlock.isSolid()) &&
+                            (moreAboveFrontBlock.getType().isAir() || !moreAboveFrontBlock.isSolid())) {
+
+                            stopClimbing(player);
+                            player.setVelocity(new Vector(0, 0.66, 0).add(climbCardinal.multiply(0.2)));
+                            player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+
+                            Vector finalClimbCardinal = climbCardinal;
+                            new BukkitRunnable() {
+                                @Override
+                                public void run() {
+                                    player.setVelocity(player.getVelocity().add(finalClimbCardinal.multiply(.3)));
                                 }
                             }.runTaskLater(nmlAcrobatics, 5);
                         }
 
                         // wall running or not
                         if (player.isSprinting()) {
-                            player.setFlySpeed(0.05f);
+                            player.setFlySpeed(0.04f);
                         } else {
                             player.setFlySpeed(0.025f);
                         }
 
-                        if (tickCounter % 20 == 0) EnergyManager.useEnergy(player, 5); // use energy every second
+                        if (tickCounter % 20 == 0) EnergyManager.useEnergy(player, 5);
                     }
                 }
 
@@ -251,24 +264,10 @@ public class Maneuvers {
                 }
                 else { // climbing logic
                     int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
-                    Vector top = player.getLocation().getDirection().setY(0).normalize().multiply(0.5);
-                    Location topLocation = player.getLocation().clone().add(top).add(0, 1.75, 0);
 
                     if (!getBottomBlock(player).getType().isAir() && !getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
-                        Vector wallNormal = player.getLocation().getDirection().setY(0).normalize();
-
-                        // snap to cardinal direction
-                        if (Math.abs(wallNormal.getX()) > Math.abs(wallNormal.getZ())) {
-                            wallNormal.setX(wallNormal.getX() > 0 ? 1 : -1);
-                            wallNormal.setZ(0);
-                        } else {
-                            wallNormal.setZ(wallNormal.getZ() > 0 ? 1 : -1);
-                            wallNormal.setX(0);
-                        }
-
                         player.setVelocity(new Vector());
-                        setStartClimbBlockLocation(player, topLocation); // top or bottom location doesn't matter
-                        setClimbCardinal(player, wallNormal);
+                        setClimbCardinal(player, getClosestWallCardinal(player));
                         climb(player, false);
                         player.removeMetadata("longjump", nmlAcrobatics);
                         cancel();
@@ -305,24 +304,10 @@ public class Maneuvers {
                 }
                 else { // climbing logic
                     int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
-                    Vector top = player.getLocation().getDirection().setY(0).normalize().multiply(0.5);
-                    Location topLocation = player.getLocation().clone().add(top).add(0, 1.75, 0);
 
                     if (!getBottomBlock(player).getType().isAir() && !getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
-                        Vector wallNormal = player.getLocation().getDirection().setY(0).normalize();
-
-                        // snap to cardinal direction
-                        if (Math.abs(wallNormal.getX()) > Math.abs(wallNormal.getZ())) {
-                            wallNormal.setX(wallNormal.getX() > 0 ? 1 : -1);
-                            wallNormal.setZ(0);
-                        } else {
-                            wallNormal.setZ(wallNormal.getZ() > 0 ? 1 : -1);
-                            wallNormal.setX(0);
-                        }
-
                         player.setVelocity(new Vector());
-                        setStartClimbBlockLocation(player, topLocation);
-                        setClimbCardinal(player, wallNormal);
+                        setClimbCardinal(player, getClosestWallCardinal(player));
                         climb(player, false);
                         player.removeMetadata("longjump", nmlAcrobatics);
                         cancel();
@@ -355,23 +340,9 @@ public class Maneuvers {
 
     public static void climb(Player player, boolean headStart) {
         int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
-        Vector top = player.getLocation().getDirection().setY(0).normalize().multiply(0.5);
-        Location topLocation = player.getLocation().clone().add(top).add(0, 1.75, 0);
 
         if (!getBottomBlock(player).getType().isAir() && !getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
-            Vector wallCardinal = player.getLocation().getDirection().setY(0).normalize();
-
-            // snap to cardinal direction
-            if (Math.abs(wallCardinal.getX()) > Math.abs(wallCardinal.getZ())) {
-                wallCardinal.setX(wallCardinal.getX() > 0 ? 1 : -1);
-                wallCardinal.setZ(0);
-            } else {
-                wallCardinal.setZ(wallCardinal.getZ() > 0 ? 1 : -1);
-                wallCardinal.setX(0);
-            }
-
-            setStartClimbBlockLocation(player, topLocation);
-            setClimbCardinal(player, wallCardinal);
+            setClimbCardinal(player, getClosestWallCardinal(player));
         }
 
         player.setMetadata("climb", new FixedMetadataValue(nmlAcrobatics, true));
@@ -389,7 +360,6 @@ public class Maneuvers {
         }
 
         player.removeMetadata("climb", nmlAcrobatics);
-        startClimbBlockLocation.remove(player.getUniqueId());
 
         new BukkitRunnable() {
             @Override
@@ -402,7 +372,15 @@ public class Maneuvers {
 
     public static void wallJump(Player player) {
         Vector climbCardinal = climbCardinals.get(player.getUniqueId());
-        Vector wallJump = player.getLocation().toVector().multiply(climbCardinal).multiply(-.00012).setY(.65);
+        Vector wallJump;
+
+        // vector changes depending on if the player is looking at the wall before jumping
+        if (getTopBlock(player).getType().isAir()) {
+            wallJump = player.getLocation().getDirection().multiply(.75).setY(.65);
+        } else {
+            wallJump = player.getLocation().toVector().multiply(climbCardinal).multiply(-.00012).setY(.65);
+        }
+
         double speed = wallJump.length();
 
         stopClimbing(player);
@@ -430,15 +408,10 @@ public class Maneuvers {
                         @Override
                         public void run() {
                             int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
-                            Vector top = player.getLocation().getDirection().setY(0).normalize().multiply(0.5);
-                            Location topLocation = player.getLocation().clone().add(top).add(0, 1.75, 0);
 
                             if (!getBottomBlock(player).getType().isAir() && !getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
-                                Vector wallCardinal = climbCardinals.get(player.getUniqueId());
-
                                 player.setVelocity(new Vector());
-                                setStartClimbBlockLocation(player, topLocation);
-                                setClimbCardinal(player, wallCardinal);
+                                setClimbCardinal(player, getClosestWallCardinal(player));
                                 climb(player, false);
                                 player.removeMetadata("longjump", nmlAcrobatics);
                                 canceled = true;
@@ -482,10 +455,6 @@ public class Maneuvers {
         player.teleport(loc.add(0, .5, 0));
     }
 
-    public static void setStartClimbBlockLocation(Player player, Location location) {
-        startClimbBlockLocation.put(player.getUniqueId(), location);
-    }
-
     public static void setClimbCardinal(Player player, Vector vector) {
         climbCardinals.put(player.getUniqueId(), vector);
     }
@@ -502,5 +471,52 @@ public class Maneuvers {
         Location topLocation = player.getLocation().clone().add(top).add(0, 1.75, 0);
 
         return topLocation.getBlock();
+    }
+
+    private static Vector getClosestWallCardinal(Player player) {
+        int radius = 2;
+        Location head = player.getLocation().add(0, 1.25, 0);
+
+        for (int dist = 0; dist <= radius; dist++) {
+            Location north = head.clone().add(0, 0, -dist);
+            Block northBlock = head.clone().add(0, 0, -dist).getBlock();
+
+            Location south = head.clone().add(0, 0, dist);
+            Block southBlock = south.getBlock();
+
+            Location east = head.clone().add(dist, 0, 0);
+            Block eastBlock = east.getBlock();
+
+            Location west = head.clone().add(-dist, 0, 0);
+            Block westBlock = west.getBlock();
+
+            if (!northBlock.getType().isAir() && hasNeighboringBlocks(north)) return new Vector(0, 0, -1);
+            if (!southBlock.getType().isAir() && hasNeighboringBlocks(south)) return new Vector(0, 0, 1);
+            if (!eastBlock.getType().isAir() && hasNeighboringBlocks(east)) return new Vector(1, 0, 0);
+            if (!westBlock.getType().isAir() && hasNeighboringBlocks(west)) return new Vector(-1, 0, 0);
+        }
+
+        return null; // no wall nearby
+    }
+
+    public static boolean hasNeighboringBlocks(Location loc) {
+        ArrayList<Block> blocks = new ArrayList<>();
+        World world = loc.getWorld();
+
+        for (double x = -1.5; x <= 1.5; x += .5) {
+            for (double z = -1.5; z <= 1.5; z += .5) {
+                if (x * x + z * z <= 1.5 * 1.5) { // circle check
+                    blocks.add(world.getBlockAt(loc.getBlockX() + (int) Math.round(x), loc.getBlockY(), loc.getBlockZ() + (int) Math.round(z)));
+                }
+            }
+        }
+
+        blocks.removeIf(block -> block.getType().isAir());
+
+        return !blocks.isEmpty();
+    }
+
+    private static boolean isFalling(Player player) {
+        return !player.isOnGround() && player.getVelocity().getY() < 0;
     }
 }
