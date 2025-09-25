@@ -1,5 +1,5 @@
 name: NMLAcrobatics
-version: '1.4'
+version: '1.5'
 main: io.github.NoOne.nMLAcrobatics.NMLAcrobatics
 api-version: '1.21'
 depend:

@@ -24,6 +24,7 @@ public class Maneuvers {
     private static final HashMap<UUID, Location> currentLocations = new HashMap<>();
     private static final HashMap<UUID, Vector> railGrindDirection = new HashMap<>();
     private static final HashMap<UUID, Double> railGrindSpeed = new HashMap<>();
+    private static final HashMap<UUID, Integer> railGrindSoundTicks = new HashMap<>();
     private static final HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
     private static final HashMap<UUID, Location> lastDirectionChangeLocation = new HashMap<>();
     private static final HashMap<UUID, Vector> climbCardinals = new HashMap<>();
@@ -32,7 +33,7 @@ public class Maneuvers {
         Maneuvers.nmlAcrobatics = nmlAcrobatics;
     }
 
-    public void startRollTask() {
+    public void rollTask() {
         rollTask = new BukkitRunnable() {
             @Override
             public void run() {
@@ -47,13 +48,22 @@ public class Maneuvers {
         }.runTaskTimer(nmlAcrobatics, 0, 2);
     }
 
-    public void startRailGrindTask() {
+    public void railGrindTask() {
         railGrindTask = new BukkitRunnable() {
-            int tickCounter = 0;
+            int soundTicks = 0;
 
             @Override
             public void run() {
-                tickCounter++;
+                soundTicks++;
+                ArrayList<UUID> soundUUIDs = new ArrayList<>();
+
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    if (player.hasMetadata("rail grind")) {
+                        soundUUIDs.add(player.getUniqueId());
+                    }
+                }
+
+                if (soundUUIDs.isEmpty()) soundTicks = 31;
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     UUID uuid = player.getUniqueId();
@@ -62,6 +72,7 @@ public class Maneuvers {
                         Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
 
                         if (isGrindable(below)) {
+                            int soundTicks = railGrindSoundTicks.getOrDefault(uuid, 0) + 1;
                             String priorDirection = lastSuccessfulRailGrindDirection.get(uuid);
                             double speed = railGrindSpeed.get(uuid);
                             boolean ableToSwitchDirection = true;
@@ -107,8 +118,16 @@ public class Maneuvers {
                             // apply velocity, multiplied by speed, to player
                             if (velocity != null) player.setVelocity(velocity.multiply(speed));
 
+                            // sound
+                            if (soundTicks == 30) {
+                                player.playSound(player, Sound.ENTITY_MINECART_RIDING, 1f, 1f);
+                                soundTicks = 0;
+                            }
+
+                            railGrindSoundTicks.put(uuid, soundTicks);
                         } else {
                             player.removeMetadata("rail grind", nmlAcrobatics);
+                            player.stopSound(Sound.ENTITY_MINECART_RIDING);
                         }
                     } else if (!player.hasMetadata("rail grind")) {
                         lastSuccessfulRailGrindDirection.remove(uuid);
@@ -121,7 +140,7 @@ public class Maneuvers {
         }.runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
-    public void startClimbTask() {
+    public void climbTask() {
         climbTask = new BukkitRunnable() {
             int tickCounter = 0;
 
@@ -172,11 +191,12 @@ public class Maneuvers {
                         if (frontBlock.getType().isSolid() && (aboveFrontBlock.getType().isAir() || !aboveFrontBlock.isSolid()) &&
                             (moreAboveFrontBlock.getType().isAir() || !moreAboveFrontBlock.isSolid())) {
 
+                            Vector finalClimbCardinal = climbCardinal;
+
                             stopClimbing(player);
                             player.setVelocity(new Vector(0, 0.66, 0).add(climbCardinal.multiply(0.2)));
                             player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
 
-                            Vector finalClimbCardinal = climbCardinal;
                             new BukkitRunnable() {
                                 @Override
                                 public void run() {
@@ -248,33 +268,10 @@ public class Maneuvers {
         player.setVelocity(longJump);
         EnergyManager.useEnergy(player, 10);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-        player.setMetadata("longjump", new FixedMetadataValue(nmlAcrobatics, true));
+        player.stopSound(Sound.ENTITY_MINECART_RIDING);
+        player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
 
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (player.isOnGround()) { // rail grind logic
-                    if (nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel() >= 20 &&
-                        isGrindable(player.getLocation().getBlock().getRelative(BlockFace.DOWN))) {
-
-                        railGrind(player, speed);
-                        player.removeMetadata("longjump", nmlAcrobatics);
-                        cancel();
-                    }
-                }
-                else { // climbing logic
-                    int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
-
-                    if (!getBottomBlock(player).getType().isAir() && !getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
-                        player.setVelocity(new Vector());
-                        setClimbCardinal(player, getClosestWallCardinal(player));
-                        climb(player, false);
-                        player.removeMetadata("longjump", nmlAcrobatics);
-                        cancel();
-                    }
-                }
-            }
-        }.runTaskTimer(nmlAcrobatics, 0, 1);
+        postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
     public static void railJump(Player player, double speed) {
@@ -286,35 +283,10 @@ public class Maneuvers {
         player.setVelocity(railJump);
         EnergyManager.useEnergy(player, 10);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-        player.setMetadata("longjump", new FixedMetadataValue(nmlAcrobatics, true));
+        player.stopSound(Sound.ENTITY_MINECART_RIDING);
+        player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
         player.removeMetadata("rail grind", nmlAcrobatics);
-
-        double finalSpeed = speed;
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (player.isOnGround()) { // rail grind logic
-                    if (nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel() >= 20 &&
-                            isGrindable(player.getLocation().getBlock().getRelative(BlockFace.DOWN))) {
-
-                        railGrind(player, finalSpeed);
-                        player.removeMetadata("longjump", nmlAcrobatics);
-                        cancel();
-                    }
-                }
-                else { // climbing logic
-                    int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
-
-                    if (!getBottomBlock(player).getType().isAir() && !getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
-                        player.setVelocity(new Vector());
-                        setClimbCardinal(player, getClosestWallCardinal(player));
-                        climb(player, false);
-                        player.removeMetadata("longjump", nmlAcrobatics);
-                        cancel();
-                    }
-                }
-            }
-        }.runTaskTimer(nmlAcrobatics, 5, 1);
+        postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 5, 1);
     }
 
     private static void railGrind(Player player, double speed) {
@@ -336,30 +308,33 @@ public class Maneuvers {
         }
 
         centerPlayer(player);
+        player.playSound(player, Sound.ENTITY_MINECART_RIDING, 1f, 1f);
+        railGrindSoundTicks.put(player.getUniqueId(), -1);
     }
 
-    public static void climb(Player player, boolean headStart) {
+    public static void climb(Player player, boolean tinyJump) {
         int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
 
-        if (!getBottomBlock(player).getType().isAir() && !getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
+        if (getBottomBlock(player).isSolid() && getTopBlock(player).isSolid() && acrobaticsLvl >= 30) {
             setClimbCardinal(player, getClosestWallCardinal(player));
+            player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
         }
 
         player.setMetadata("climb", new FixedMetadataValue(nmlAcrobatics, true));
         player.setAllowFlight(true);
         player.setFlying(true);
 
-        if (headStart) player.setVelocity(player.getVelocity().add(new Vector(0 , .2, 0)));
+        if (tinyJump) player.setVelocity(player.getVelocity().add(new Vector(0 , .2, 0)));
     }
 
     public static void stopClimbing(Player player) {
+        player.removeMetadata("climb", nmlAcrobatics);
+
         if (player.getGameMode() != GameMode.CREATIVE) {
             player.setAllowFlight(false);
         } else {
             player.setFlying(false);
         }
-
-        player.removeMetadata("climb", nmlAcrobatics);
 
         new BukkitRunnable() {
             @Override
@@ -375,20 +350,20 @@ public class Maneuvers {
         Vector wallJump;
 
         // vector changes depending on if the player is looking at the wall before jumping
-        if (getTopBlock(player).getType().isAir()) {
+        if (getTopBlock(player, 1).getType().isAir()) { // looking away from wall
             wallJump = player.getLocation().getDirection().multiply(.75).setY(.65);
-        } else {
+        } else { // looking at wall
             wallJump = player.getLocation().toVector().multiply(climbCardinal).multiply(-.00012).setY(.65);
         }
 
         double speed = wallJump.length();
-
         stopClimbing(player);
         player.setVelocity(wallJump);
         EnergyManager.useEnergy(player, 10);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-        player.setMetadata("longjump", new FixedMetadataValue(nmlAcrobatics, true));
+        player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
 
+        // slightly different from the postJumpRunnable();
         new BukkitRunnable() {
             boolean canceled = false;
             @Override
@@ -398,32 +373,54 @@ public class Maneuvers {
                             isGrindable(player.getLocation().getBlock().getRelative(BlockFace.DOWN))) {
 
                         railGrind(player, speed);
-                        player.removeMetadata("longjump", nmlAcrobatics);
+                        player.removeMetadata("long jump", nmlAcrobatics);
                         canceled = true;
                         cancel();
                     }
                 }
                 else { // climbing logic
-                    new BukkitRunnable() { // have to delay it a little bit so the data can clear from the existing wall
-                        @Override
-                        public void run() {
-                            int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
+                    int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
 
-                            if (!getBottomBlock(player).getType().isAir() && !getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
-                                player.setVelocity(new Vector());
-                                setClimbCardinal(player, getClosestWallCardinal(player));
-                                climb(player, false);
-                                player.removeMetadata("longjump", nmlAcrobatics);
-                                canceled = true;
-                                cancel();
-                            }
-                        }
-                    }.runTaskLater(nmlAcrobatics, 3);
+                    if (!getBottomBlock(player).getType().isAir() && !getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
+                        setClimbCardinal(player, getClosestWallCardinal(player));
+                        player.setVelocity(new Vector());
+                        climb(player, false);
+                        player.removeMetadata("long jump", nmlAcrobatics);
+                        canceled = true;
+                        cancel();
+                    }
                 }
-
-                if (canceled) cancel();
             }
-        }.runTaskTimer(nmlAcrobatics, 0, 1);
+        }.runTaskTimer(nmlAcrobatics, 3, 1);
+    }
+
+    private static BukkitRunnable postJumpRunnable(Player player, double speed) {
+         return new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (player.isOnGround()) { // rail grind logic
+                    if (nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel() >= 20 &&
+                            isGrindable(player.getLocation().getBlock().getRelative(BlockFace.DOWN))) {
+
+                        railGrind(player, speed);
+                        player.removeMetadata("long jump", nmlAcrobatics);
+
+                        cancel();
+                    }
+                }
+                else { // climbing logic
+                    int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
+
+                    if (!getBottomBlock(player).getType().isAir() && !getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
+                        player.setVelocity(new Vector());
+                        setClimbCardinal(player, getClosestWallCardinal(player));
+                        climb(player, false);
+                        player.removeMetadata("long jump", nmlAcrobatics);
+                        cancel();
+                    }
+                }
+            }
+        };
     }
 
     private static boolean isGrindable(Block block) {
@@ -468,6 +465,13 @@ public class Maneuvers {
 
     public static Block getTopBlock(Player player) {
         Vector top = player.getLocation().getDirection().setY(0).normalize().multiply(0.5);
+        Location topLocation = player.getLocation().clone().add(top).add(0, 1.75, 0);
+
+        return topLocation.getBlock();
+    }
+
+    public static Block getTopBlock(Player player, double distance) {
+        Vector top = player.getLocation().getDirection().setY(0).normalize().multiply(distance);
         Location topLocation = player.getLocation().clone().add(top).add(0, 1.75, 0);
 
         return topLocation.getBlock();

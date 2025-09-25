@@ -6,7 +6,7 @@
 
     <groupId>io.github.NoOne</groupId>
     <artifactId>NMLAcrobatics</artifactId>
-    <version>1.4</version>
+    <version>1.5</version>
     <packaging>jar</packaging>
 
     <name>NMLAcrobatics</name>

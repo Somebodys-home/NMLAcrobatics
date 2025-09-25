@@ -152,6 +152,7 @@ public class AcrobaticsListener implements Listener {
                 Maneuvers.railJump(player, player.getVelocity().length());
             } else if (event.getInput().isSneak()) {
                 player.removeMetadata("rail grind", nmlAcrobatics);
+                player.stopSound(Sound.ENTITY_MINECART_RIDING);
             }
         }
     }
