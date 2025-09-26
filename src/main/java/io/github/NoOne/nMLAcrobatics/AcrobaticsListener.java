@@ -149,7 +149,13 @@ public class AcrobaticsListener implements Listener {
         if (player.hasMetadata("rail grind")) {
             if (event.getInput().isJump()) {
                 player.removeMetadata("rail grind", nmlAcrobatics);
-                Maneuvers.railJump(player, player.getVelocity().length());
+
+                new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        Maneuvers.railJump(player, player.getVelocity().length());
+                    }
+                }.runTaskLater(nmlAcrobatics, 1);
             } else if (event.getInput().isSneak()) {
                 player.removeMetadata("rail grind", nmlAcrobatics);
                 player.stopSound(Sound.ENTITY_MINECART_RIDING);

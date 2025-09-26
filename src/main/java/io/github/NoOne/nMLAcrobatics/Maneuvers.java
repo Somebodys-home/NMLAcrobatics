@@ -9,10 +9,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 
 public class Maneuvers {
@@ -64,6 +66,7 @@ public class Maneuvers {
                 }
 
                 if (soundUUIDs.isEmpty()) soundTicks = 31;
+                // ^^ sound ^^
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     UUID uuid = player.getUniqueId();
@@ -122,6 +125,21 @@ public class Maneuvers {
                             if (soundTicks == 30) {
                                 player.playSound(player, Sound.ENTITY_MINECART_RIDING, 1f, 1f);
                                 soundTicks = 0;
+                            }
+
+                            // particle helper
+                            Location particleLocation = calculateRailJumpLandingPosition(player);
+                            Particle.DustOptions green = new Particle.DustOptions(Color.FUCHSIA, 1.0F);
+
+                            if (!particleLocation.getBlock().getType().isAir()) {
+                                List<Location> particleWireFrame = getHollowCube(particleLocation.clone().add(.5, .5, .5),
+                                        particleLocation.clone().add(-.5, -.5, -.5), .25);
+
+                                for (Location location : particleWireFrame) {
+                                    player.getWorld().spawnParticle(Particle.DUST, location, 1, 0, 0, 0, green);
+                                }
+                            } else {
+                                player.getWorld().spawnParticle(Particle.DUST, particleLocation, 1, 0, 0, 0, green);
                             }
 
                             railGrindSoundTicks.put(uuid, soundTicks);
@@ -308,8 +326,7 @@ public class Maneuvers {
         }
 
         centerPlayer(player);
-        player.playSound(player, Sound.ENTITY_MINECART_RIDING, 1f, 1f);
-        railGrindSoundTicks.put(player.getUniqueId(), -1);
+        railGrindSoundTicks.put(player.getUniqueId(), 29);
     }
 
     public static void climb(Player player, boolean tinyJump) {
@@ -394,6 +411,51 @@ public class Maneuvers {
         }.runTaskTimer(nmlAcrobatics, 3, 1);
     }
 
+    private static void centerPlayer(Player player) {
+        Location loc = player.getLocation();
+        float yaw = player.getLocation().getYaw();
+        float pitch = player.getLocation().getPitch();
+
+        loc.setX(loc.getBlockX() + 0.5);
+        loc.setY(loc.getBlockY()); // keep current Y
+        loc.setZ(loc.getBlockZ() + 0.5);
+        loc.setYaw(yaw);   // keep facing the same way
+        loc.setPitch(pitch);
+
+        player.teleport(loc.add(0, .5, 0));
+    }
+
+    public static void setClimbCardinal(Player player, Vector vector) {
+        climbCardinals.put(player.getUniqueId(), vector);
+    }
+
+    public List<Location> getHollowCube(Location corner1, Location corner2, double particleDistance) {
+        List<Location> result = new ArrayList<>();
+        World world = corner1.getWorld();
+        double minX = Math.min(corner1.getX(), corner2.getX());
+        double minY = Math.min(corner1.getY(), corner2.getY());
+        double minZ = Math.min(corner1.getZ(), corner2.getZ());
+        double maxX = Math.max(corner1.getX(), corner2.getX());
+        double maxY = Math.max(corner1.getY(), corner2.getY());
+        double maxZ = Math.max(corner1.getZ(), corner2.getZ());
+
+        for (double x = minX; x <= maxX; x+=particleDistance) {
+            for (double y = minY; y <= maxY; y+=particleDistance) {
+                for (double z = minZ; z <= maxZ; z+=particleDistance) {
+                    int components = 0;
+                    if (x == minX || x == maxX) components++;
+                    if (y == minY || y == maxY) components++;
+                    if (z == minZ || z == maxZ) components++;
+                    if (components >= 2) {
+                        result.add(new Location(world, x, y, z));
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
     private static BukkitRunnable postJumpRunnable(Player player, double speed) {
          return new BukkitRunnable() {
             @Override
@@ -436,24 +498,6 @@ public class Maneuvers {
                 block.getType() == Material.CRIMSON_FENCE || block.getType() == Material.CRIMSON_FENCE_GATE ||
                 block.getType() == Material.WARPED_FENCE || block.getType() == Material.WARPED_FENCE_GATE ||
                 block.getType() == Material.NETHER_BRICK_FENCE || block.getType() == Material.IRON_BARS;
-    }
-
-    private static void centerPlayer(Player player) {
-        Location loc = player.getLocation();
-        float yaw = player.getLocation().getYaw();
-        float pitch = player.getLocation().getPitch();
-
-        loc.setX(loc.getBlockX() + 0.5);
-        loc.setY(loc.getBlockY()); // keep current Y
-        loc.setZ(loc.getBlockZ() + 0.5);
-        loc.setYaw(yaw);   // keep facing the same way
-        loc.setPitch(pitch);
-
-        player.teleport(loc.add(0, .5, 0));
-    }
-
-    public static void setClimbCardinal(Player player, Vector vector) {
-        climbCardinals.put(player.getUniqueId(), vector);
     }
 
     public static Block getBottomBlock(Player player) {
@@ -523,4 +567,78 @@ public class Maneuvers {
     private static boolean isFalling(Player player) {
         return !player.isOnGround() && player.getVelocity().getY() < 0;
     }
+
+    // i gave up halfway through and just used AI to debug this im sorry but its 2:27 AM
+    // i'm not as strong a man when i dont have enough sleep and i just wanted to get this done
+    // i have a broken ukulele if that's whatchu want outta me
+    public static Location calculateRailJumpLandingPosition(Player player) {
+        Location startLoc = player.getLocation().clone();
+        double startY = startLoc.getY();                 // plane we want to land on (player's feet Y)
+        Location simLoc = startLoc.clone().add(0, player.getEyeHeight() * 0.75, 0); // start a little above feet (same as you had)
+
+        // EXACT same initial velocity expression you use to launch the real player
+        Vector v = player.getLocation().getDirection().clone().multiply(1.5);
+        v.setY(0.5);
+
+        World world = player.getWorld();
+
+        final double g = 0.08;    // gravity per tick (same as before)
+        final double d = 0.93;    // drag per tick (same as before)
+        final int MAX_TICKS = 1000;
+        final double EPS = 1e-9;
+
+        double v0x = v.getX();
+        double v0y = v.getY();
+        double v0z = v.getZ();
+
+        // iterate ticks (but use closed-form sums so we don't accumulate integration error)
+        for (int n = 0; n < MAX_TICKS; n++) {
+            double dPowN = Math.pow(d, n);                 // d^n
+            double oneMinusDPowN = 1.0 - dPowN;
+            double denom = 1.0 - d;                        // (1 - d), safe because d != 1
+
+            // horizontal displacement after n whole ticks: v0x * (1 - d^n) / (1 - d)
+            double sumX = (denom == 0.0) ? v0x * n : v0x * (oneMinusDPowN / denom);
+            double sumZ = (denom == 0.0) ? v0z * n : v0z * (oneMinusDPowN / denom);
+
+            // vertical displacement after n whole ticks (closed form)
+            // term1 = v0y * (1 - d^n) / (1 - d)
+            double term1 = (denom == 0.0) ? v0y * n : v0y * (oneMinusDPowN / denom);
+            // term2 = (g * d / (1 - d)) * ( n - (1 - d^n) / (1 - d) )
+            double term2 = (g * d / denom) * ( n - (oneMinusDPowN / denom) );
+            double deltaY = term1 - term2;
+            double yAfterN = simLoc.getY() + deltaY;
+
+            // velocity at start of tick n (the velocity that will move the entity during tick n)
+            double vAtN_y = v0y * dPowN - (g * d * (1.0 - dPowN) / (1.0 - d));
+            // horizontal velocities at start of tick n
+            double vAtN_x = v0x * dPowN;
+            double vAtN_z = v0z * dPowN;
+
+            // check if during this tick the Y crosses the landing plane:
+            // movement during this tick is yAfterN -> yAfterN + vAtN_y
+            if (yAfterN + vAtN_y <= startY + EPS) {
+                // fraction along this tick where y == startY
+                double t;
+                if (Math.abs(vAtN_y) < EPS) {
+                    t = 0.0;
+                } else {
+                    t = (startY - yAfterN) / vAtN_y;
+                    if (Double.isNaN(t) || Double.isInfinite(t)) t = 0.0;
+                }
+                t = Math.max(0.0, Math.min(1.0, t));
+
+                // X and Z at crossing:
+                double x = simLoc.getX() + sumX + t * vAtN_x;
+                double z = simLoc.getZ() + sumZ + t * vAtN_z;
+
+                return new Location(world, x, startY - 1, z); // keep your -1 exactly as requested
+            }
+        }
+
+        // fallback: didn't cross within MAX_TICKS (shouldn't happen); return last simLoc horizontally
+        return new Location(world, simLoc.getX(), startY - 1, simLoc.getZ());
+    }
+
+
 }
