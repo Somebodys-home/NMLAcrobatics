@@ -20,6 +20,7 @@ public final class NMLAcrobatics extends JavaPlugin {
         maneuvers.climbTask();
 
         getServer().getPluginManager().registerEvents(new AcrobaticsListener(this), this);
+        this.getCommand("setyawandpitch").setExecutor(new SetYawAndPitchCommand());
     }
 
     @Override

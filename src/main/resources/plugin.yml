@@ -4,3 +4,7 @@ main: io.github.NoOne.nMLAcrobatics.NMLAcrobatics
 api-version: '1.21'
 depend:
   - NMLSkills
+commands:
+  setyawandpitch:
+    description: Sets your yaw and pitch
+    usage: /setyawandpitch <yaw> <pitch>

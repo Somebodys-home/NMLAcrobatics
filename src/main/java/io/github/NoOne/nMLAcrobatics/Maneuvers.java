@@ -9,9 +9,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,6 +27,7 @@ public class Maneuvers {
     private static final HashMap<UUID, Integer> railGrindSoundTicks = new HashMap<>();
     private static final HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
     private static final HashMap<UUID, Location> lastDirectionChangeLocation = new HashMap<>();
+    private static final HashMap<UUID, Location> railGrindParticleLocation = new HashMap<>();
     private static final HashMap<UUID, Vector> climbCardinals = new HashMap<>();
 
     public Maneuvers(NMLAcrobatics nmlAcrobatics) {
@@ -56,6 +55,7 @@ public class Maneuvers {
 
             @Override
             public void run() {
+                // vv sound vv
                 soundTicks++;
                 ArrayList<UUID> soundUUIDs = new ArrayList<>();
 
@@ -81,6 +81,9 @@ public class Maneuvers {
                             boolean ableToSwitchDirection = true;
                             String newDirection = null;
                             Vector velocity = null;
+
+                            Location particleLocation = calculateRailJumpLandingPosition(player);
+                            Particle.DustOptions fuchsia = new Particle.DustOptions(Color.FUCHSIA, 1.0F);
 
                             Block base = player.getLocation().getBlock();
                             Block northBlock = base.getRelative(BlockFace.NORTH).getRelative(BlockFace.DOWN);
@@ -128,20 +131,18 @@ public class Maneuvers {
                             }
 
                             // particle helper
-                            Location particleLocation = calculateRailJumpLandingPosition(player);
-                            Particle.DustOptions green = new Particle.DustOptions(Color.FUCHSIA, 1.0F);
-
                             if (!particleLocation.getBlock().getType().isAir()) {
-                                List<Location> particleWireFrame = getHollowCube(particleLocation.clone().add(.5, .5, .5),
+                                List<Location> particleWireFrame = createHollowCube(particleLocation.clone().add(.5, .5, .5),
                                         particleLocation.clone().add(-.5, -.5, -.5), .25);
 
                                 for (Location location : particleWireFrame) {
-                                    player.getWorld().spawnParticle(Particle.DUST, location, 1, 0, 0, 0, green);
+                                    player.getWorld().spawnParticle(Particle.DUST, location, 1, 0, 0, 0, fuchsia);
                                 }
                             } else {
-                                player.getWorld().spawnParticle(Particle.DUST, particleLocation, 1, 0, 0, 0, green);
+                                player.getWorld().spawnParticle(Particle.DUST, particleLocation, 1, 0, 0, 0, fuchsia);
                             }
 
+                            railGrindParticleLocation.put(uuid, particleLocation);
                             railGrindSoundTicks.put(uuid, soundTicks);
                         } else {
                             player.removeMetadata("rail grind", nmlAcrobatics);
@@ -236,7 +237,7 @@ public class Maneuvers {
 
                 if (tickCounter % 20 == 0) tickCounter = 0;
             }
-        }.runTaskTimer(nmlAcrobatics, 0, 1);
+        }.runTaskTimer(nmlAcrobatics, 0, 2);
     }
 
     public void stopTasks() {
@@ -292,21 +293,6 @@ public class Maneuvers {
         postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
-    public static void railJump(Player player, double speed) {
-        Vector railJump = player.getLocation().getDirection().normalize().multiply(1.5).setY(.5);
-
-        if (speed < 1) speed = 1;
-
-        railJump.multiply(speed);
-        player.setVelocity(railJump);
-        EnergyManager.useEnergy(player, 10);
-        player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-        player.stopSound(Sound.ENTITY_MINECART_RIDING);
-        player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
-        player.removeMetadata("rail grind", nmlAcrobatics);
-        postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 5, 1);
-    }
-
     private static void railGrind(Player player, double speed) {
         player.setMetadata("rail grind", new FixedMetadataValue(nmlAcrobatics, true));
         railGrindDirection.put(player.getUniqueId(), player.getLocation().getDirection());
@@ -327,6 +313,21 @@ public class Maneuvers {
 
         centerPlayer(player);
         railGrindSoundTicks.put(player.getUniqueId(), 29);
+    }
+
+    public static void railJump(Player player, double speed) {
+        Location particleLocation = railGrindParticleLocation.get(player.getUniqueId());
+        Vector railJump = particleLocation.subtract(player.getLocation()).toVector().multiply(.122).setY(.5);
+
+        if (speed < 1) speed = 1;
+
+        player.setVelocity(railJump.multiply(speed));
+        EnergyManager.useEnergy(player, 5);
+        player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+        player.stopSound(Sound.ENTITY_MINECART_RIDING);
+        player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
+        player.removeMetadata("rail grind", nmlAcrobatics);
+        postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 5, 1);
     }
 
     public static void climb(Player player, boolean tinyJump) {
@@ -376,7 +377,7 @@ public class Maneuvers {
         double speed = wallJump.length();
         stopClimbing(player);
         player.setVelocity(wallJump);
-        EnergyManager.useEnergy(player, 10);
+        EnergyManager.useEnergy(player, 5);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
         player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
 
@@ -429,7 +430,7 @@ public class Maneuvers {
         climbCardinals.put(player.getUniqueId(), vector);
     }
 
-    public List<Location> getHollowCube(Location corner1, Location corner2, double particleDistance) {
+    public List<Location> createHollowCube(Location corner1, Location corner2, double particleDistance) {
         List<Location> result = new ArrayList<>();
         World world = corner1.getWorld();
         double minX = Math.min(corner1.getX(), corner2.getX());
@@ -462,7 +463,7 @@ public class Maneuvers {
             public void run() {
                 if (player.isOnGround()) { // rail grind logic
                     if (nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel() >= 20 &&
-                            isGrindable(player.getLocation().getBlock().getRelative(BlockFace.DOWN))) {
+                        isGrindable(player.getLocation().getBlock().getRelative(BlockFace.DOWN))) {
 
                         railGrind(player, speed);
                         player.removeMetadata("long jump", nmlAcrobatics);
@@ -573,17 +574,17 @@ public class Maneuvers {
     // i have a broken ukulele if that's whatchu want outta me
     public static Location calculateRailJumpLandingPosition(Player player) {
         Location startLoc = player.getLocation().clone();
-        double startY = startLoc.getY();                 // plane we want to land on (player's feet Y)
-        Location simLoc = startLoc.clone().add(0, player.getEyeHeight() * 0.75, 0); // start a little above feet (same as you had)
-
-        // EXACT same initial velocity expression you use to launch the real player
-        Vector v = player.getLocation().getDirection().clone().multiply(1.5);
-        v.setY(0.5);
+        double startY = startLoc.getY();
+        Location simLoc = startLoc.clone().add(0, 0.1, 0); // same as before
 
         World world = player.getWorld();
 
-        final double g = 0.08;    // gravity per tick (same as before)
-        final double d = 0.93;    // drag per tick (same as before)
+        // EXACT same initial velocity expression you used originally
+        Vector v = player.getLocation().getDirection().clone().normalize().multiply(1.5);
+        v.setY(0.5);
+
+        final double g = 0.08;
+        final double d = 0.93;
         final int MAX_TICKS = 1000;
         final double EPS = 1e-9;
 
@@ -591,34 +592,26 @@ public class Maneuvers {
         double v0y = v.getY();
         double v0z = v.getZ();
 
-        // iterate ticks (but use closed-form sums so we don't accumulate integration error)
+        // iterate ticks using closed-form sums to avoid integration bias
         for (int n = 0; n < MAX_TICKS; n++) {
             double dPowN = Math.pow(d, n);                 // d^n
             double oneMinusDPowN = 1.0 - dPowN;
-            double denom = 1.0 - d;                        // (1 - d), safe because d != 1
+            double denom = 1.0 - d;                        // (1 - d)
 
-            // horizontal displacement after n whole ticks: v0x * (1 - d^n) / (1 - d)
             double sumX = (denom == 0.0) ? v0x * n : v0x * (oneMinusDPowN / denom);
             double sumZ = (denom == 0.0) ? v0z * n : v0z * (oneMinusDPowN / denom);
 
-            // vertical displacement after n whole ticks (closed form)
-            // term1 = v0y * (1 - d^n) / (1 - d)
             double term1 = (denom == 0.0) ? v0y * n : v0y * (oneMinusDPowN / denom);
-            // term2 = (g * d / (1 - d)) * ( n - (1 - d^n) / (1 - d) )
             double term2 = (g * d / denom) * ( n - (oneMinusDPowN / denom) );
             double deltaY = term1 - term2;
             double yAfterN = simLoc.getY() + deltaY;
 
-            // velocity at start of tick n (the velocity that will move the entity during tick n)
             double vAtN_y = v0y * dPowN - (g * d * (1.0 - dPowN) / (1.0 - d));
-            // horizontal velocities at start of tick n
             double vAtN_x = v0x * dPowN;
             double vAtN_z = v0z * dPowN;
 
-            // check if during this tick the Y crosses the landing plane:
-            // movement during this tick is yAfterN -> yAfterN + vAtN_y
+            // check if this tick will cross startY
             if (yAfterN + vAtN_y <= startY + EPS) {
-                // fraction along this tick where y == startY
                 double t;
                 if (Math.abs(vAtN_y) < EPS) {
                     t = 0.0;
@@ -628,17 +621,33 @@ public class Maneuvers {
                 }
                 t = Math.max(0.0, Math.min(1.0, t));
 
-                // X and Z at crossing:
                 double x = simLoc.getX() + sumX + t * vAtN_x;
                 double z = simLoc.getZ() + sumZ + t * vAtN_z;
 
-                return new Location(world, x, startY - 1, z); // keep your -1 exactly as requested
+                // ---- EMPIRICAL FIX: extend horizontal by +1 block along travel direction ----
+                double dx = x - startLoc.getX();
+                double dz = z - startLoc.getZ();
+                double horizDist = Math.sqrt(dx * dx + dz * dz);
+                if (horizDist > 1e-6) {
+                    double correction = 1.0; // 1 block forward correction (tweak if necessary)
+                    x += (dx / horizDist) * correction;
+                    z += (dz / horizDist) * correction;
+                }
+                // return with your requested -1 Y offset
+                return new Location(world, x, startY - 1, z);
             }
         }
 
-        // fallback: didn't cross within MAX_TICKS (shouldn't happen); return last simLoc horizontally
-        return new Location(world, simLoc.getX(), startY - 1, simLoc.getZ());
+        // fallback: extend last sim location horizontally by +1 block as well
+        double fx = simLoc.getX();
+        double fz = simLoc.getZ();
+        double ddx = fx - startLoc.getX();
+        double ddz = fz - startLoc.getZ();
+        double fDist = Math.sqrt(ddx * ddx + ddz * ddz);
+        if (fDist > 1e-6) {
+            fx += (ddx / fDist);
+            fz += (ddz / fDist);
+        }
+        return new Location(world, fx, startY - 1, fz);
     }
-
-
 }
