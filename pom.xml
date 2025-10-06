@@ -6,7 +6,7 @@
 
     <groupId>io.github.NoOne</groupId>
     <artifactId>NMLAcrobatics</artifactId>
-    <version>1.6</version>
+    <version>1.0</version>
     <packaging>jar</packaging>
 
     <name>NMLAcrobatics</name>
@@ -91,7 +91,13 @@
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLEnergySystem</artifactId>
-            <version>4dd6002d90</version>
+            <version>8f34b44367</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.Somebodys-home</groupId>
+            <artifactId>NMLPlayerStats</artifactId>
+            <version>ebafde7799</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

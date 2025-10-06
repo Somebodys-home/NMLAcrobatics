@@ -3,9 +3,7 @@ package io.github.NoOne.nMLAcrobatics;
 import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import io.github.Gabriel.expertiseStylePlugin.AbilitySystem.CooldownSystem.CooldownManager;
 import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
-import org.bukkit.Location;
 import org.bukkit.Sound;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -15,7 +13,6 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.UUID;
@@ -88,58 +85,32 @@ public class AcrobaticsListener implements Listener {
     }
 
     @EventHandler
-    public void shiftingMetadata(PlayerToggleSneakEvent event) {
+    public void startLongJumpMetadata(PlayerToggleSneakEvent event) {
         Player player = event.getPlayer();
         int acrobaticsLvl = skillSetManager.getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
 
         if (!event.isSneaking()) return;
-
-        if (player.hasMetadata("climb")) {
-            player.setMetadata("start wall jump", new FixedMetadataValue(nmlAcrobatics, true));
-
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    player.removeMetadata("start wall jump", nmlAcrobatics);
-                }
-            }.runTaskLater(nmlAcrobatics, 5L);
-
-            return;
-        }
-        if (!Maneuvers.getBottomBlock(player).getType().isAir() && !Maneuvers.getTopBlock(player).getType().isAir() && acrobaticsLvl >= 30) {
-            player.setMetadata("start climb", new FixedMetadataValue(nmlAcrobatics, true));
+        if (player.isSprinting() && acrobaticsLvl >= 10) {
+            player.setMetadata("start long jump", new FixedMetadataValue(nmlAcrobatics, true));
 
             new BukkitRunnable() {
                 @Override
                 public void run() {
-                    player.removeMetadata("start climb", nmlAcrobatics);
-                }
-            }.runTaskLater(nmlAcrobatics, 5L);
-        }
-        else if (player.isSprinting() && acrobaticsLvl >= 10) {
-            player.setMetadata("start longjump", new FixedMetadataValue(nmlAcrobatics, true));
-
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    player.removeMetadata("start longjump", nmlAcrobatics);
+                    player.removeMetadata("start long jump", nmlAcrobatics);
                 }
             }.runTaskLater(nmlAcrobatics, 5L);
         }
     }
 
     @EventHandler
-    public void shiftJumpManeuver(PlayerJumpEvent event) {
+    public void actualLongJump(PlayerJumpEvent event) {
         Player player = event.getPlayer();
 
-        if (player.hasMetadata("start longjump")) {
-            player.removeMetadata("start longjump", nmlAcrobatics);
+        if (player.hasMetadata("start long jump")) {
+            player.removeMetadata("start long jump", nmlAcrobatics);
             Maneuvers.longJump(player);
         }
-        else if (player.hasMetadata("start climb")) {
-            player.removeMetadata("start climb", nmlAcrobatics);
-            Maneuvers.climb(player, true);
-        }
+
     }
 
     @EventHandler
@@ -167,9 +138,17 @@ public class AcrobaticsListener implements Listener {
     public void wallJump(PlayerInputEvent event) {
         Player player = event.getPlayer();
 
-        if (event.getInput().isJump() && player.hasMetadata("start wall jump")) {
-            player.removeMetadata("start wall jump", nmlAcrobatics);
+        if (player.hasMetadata("climb") && event.getInput().isJump()) {
             Maneuvers.wallJump(player);
+        }
+    }
+
+    @EventHandler
+    public void stopWallRunning(PlayerToggleSneakEvent event) {
+        Player player = event.getPlayer();
+
+        if (event.isSneaking() && player.hasMetadata("climb")) {
+            Maneuvers.stopWallRunning(player);
         }
     }
 }
