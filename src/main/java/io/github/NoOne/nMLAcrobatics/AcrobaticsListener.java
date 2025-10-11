@@ -138,7 +138,7 @@ public class AcrobaticsListener implements Listener {
     public void wallJump(PlayerInputEvent event) {
         Player player = event.getPlayer();
 
-        if (player.hasMetadata("climb") && event.getInput().isJump()) {
+        if (player.hasMetadata("wall run") && event.getInput().isJump()) {
             Maneuvers.wallJump(player);
         }
     }
@@ -147,7 +147,7 @@ public class AcrobaticsListener implements Listener {
     public void stopWallRunning(PlayerToggleSneakEvent event) {
         Player player = event.getPlayer();
 
-        if (event.isSneaking() && player.hasMetadata("climb")) {
+        if (event.isSneaking() && player.hasMetadata("wall run")) {
             Maneuvers.stopWallRunning(player);
         }
     }
