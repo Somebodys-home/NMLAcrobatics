@@ -1,6 +1,6 @@
 package io.github.NoOne.nMLAcrobatics;
 
-import io.github.Gabriel.expertiseStylePlugin.AbilitySystem.CooldownSystem.CooldownManager;
+import io.github.NoOne.expertiseStylePlugin.abilitySystem.cooldownSystem.CooldownManager;
 import io.github.NoOne.nMLEnergySystem.EnergyManager;
 import org.bukkit.*;
 import org.bukkit.block.Block;

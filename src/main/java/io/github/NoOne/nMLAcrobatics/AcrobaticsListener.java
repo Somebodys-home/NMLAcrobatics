@@ -1,7 +1,7 @@
 package io.github.NoOne.nMLAcrobatics;
 
 import com.destroystokyo.paper.event.player.PlayerJumpEvent;
-import io.github.Gabriel.expertiseStylePlugin.AbilitySystem.CooldownSystem.CooldownManager;
+import io.github.NoOne.expertiseStylePlugin.abilitySystem.cooldownSystem.CooldownManager;
 import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
