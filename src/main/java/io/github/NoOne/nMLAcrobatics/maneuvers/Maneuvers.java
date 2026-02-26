@@ -1,6 +1,7 @@
-package io.github.NoOne.nMLAcrobatics;
+package io.github.NoOne.nMLAcrobatics.maneuvers;
 
 import io.github.NoOne.expertiseStylePlugin.abilitySystem.cooldownSystem.CooldownManager;
+import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import io.github.NoOne.nMLEnergySystem.EnergyManager;
 import org.bukkit.*;
 import org.bukkit.block.Block;
@@ -20,12 +21,12 @@ public class Maneuvers {
     private BukkitTask wallRunTask;
     private static final HashMap<UUID, Location> lastLocations = new HashMap<>(); // what
     private static final HashMap<UUID, Location> currentLocations = new HashMap<>();
-    private static final HashMap<UUID, Vector> railGrindDirection = new HashMap<>();
     private static final HashMap<UUID, Double> railGrindSpeed = new HashMap<>();
     private static final HashMap<UUID, Integer> railGrindSoundTicks = new HashMap<>();
     private static final HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
     private static final HashMap<UUID, Location> lastDirectionChangeLocation = new HashMap<>();
     private static final HashMap<UUID, Location> railGrindParticleLocation = new HashMap<>();
+    private static final HashMap<UUID, BukkitTask> railGrindComboTasks = new HashMap<>(); // just to keep up a combo while rail grinding
     private static final HashMap<UUID, Vector> wallCardinals = new HashMap<>(); // only to know where to push the player back to when on a wall
     private static final HashMap<UUID, Double> wallRunSpeeds = new HashMap<>(); // speed that you start wall running at
     private static final HashMap<UUID, Integer> wallRunTimes = new HashMap<>(); // the amount of time that you spend wall running
@@ -55,8 +56,9 @@ public class Maneuvers {
 
             @Override
             public void run() {
-                // vv sound vv
                 soundTicks++;
+
+                /// sound
                 ArrayList<UUID> soundUUIDs = new ArrayList<>();
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
@@ -66,13 +68,12 @@ public class Maneuvers {
                 }
 
                 if (soundUUIDs.isEmpty()) soundTicks = 31;
-                // ^^ sound ^^
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
-                    Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
-                    UUID uuid = player.getUniqueId();
-
                     if (player.hasMetadata("rail grind")) {
+                        UUID uuid = player.getUniqueId();
+                        Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+
                         if (isGrindable(below)) {
                             int soundTicks = railGrindSoundTicks.getOrDefault(uuid, 0) + 1;
                             String priorDirection = lastSuccessfulRailGrindDirection.get(uuid);
@@ -144,14 +145,8 @@ public class Maneuvers {
                             railGrindParticleLocation.put(uuid, particleLocation);
                             railGrindSoundTicks.put(uuid, soundTicks);
                         } else {
-                            player.removeMetadata("rail grind", nmlAcrobatics);
-                            player.stopSound(Sound.ENTITY_MINECART_RIDING);
+                            stopRailGrinding(player);
                         }
-                    } else if (!player.hasMetadata("rail grind")) {
-                        lastSuccessfulRailGrindDirection.remove(uuid);
-                        lastDirectionChangeLocation.remove(uuid);
-                        railGrindSpeed.remove(uuid);
-                        railGrindDirection.remove(uuid);
                     }
                 }
             }
@@ -217,11 +212,12 @@ public class Maneuvers {
                             }.runTaskLater(nmlAcrobatics, 5);
                         }
 
-                        if (tickCounter % 5 == 0) EnergyManager.useEnergy(player, 2);
+                        if (tickCounter == 10) {
+                            EnergyManager.useEnergy(player, 5);
+                            tickCounter = 0;
+                        }
                     }
                 }
-
-                if (tickCounter % 5 == 0) tickCounter = 0;
             }
         }.runTaskTimer(nmlAcrobatics, 0, 2);
     }
@@ -246,10 +242,11 @@ public class Maneuvers {
             Vector roll = movement.normalize().multiply(2);
 
             player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-            EnergyManager.useEnergy(player, 5);
+            EnergyManager.useEnergy(player, 1); /// testing purposes
             CooldownManager.putAllAbilitiesOnCooldown(player, 1.5);
             player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
             player.setVelocity(roll);
+            Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Roll"));
 
             new BukkitRunnable() {
                 @Override
@@ -265,6 +262,7 @@ public class Maneuvers {
 
         player.setVelocity(roll);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+        Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Roll Brace"));
     }
 
     /// long jump methods
@@ -273,19 +271,19 @@ public class Maneuvers {
         double speed = longJump.length();
 
         player.setVelocity(longJump);
-        EnergyManager.useEnergy(player, 10);
+        EnergyManager.useEnergy(player, 1); /// testing purposes
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
         player.stopSound(Sound.ENTITY_MINECART_RIDING);
         player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
-
+        Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Long Jump"));
         postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
     /// rail grind methods
     private static void railGrind(Player player, double speed) {
         player.setMetadata("rail grind", new FixedMetadataValue(nmlAcrobatics, true));
-        railGrindDirection.put(player.getUniqueId(), player.getLocation().getDirection());
         railGrindSpeed.put(player.getUniqueId(), speed);
+        player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
 
         float yaw = player.getLocation().getYaw();
         yaw = (yaw % 360 + 360) % 360; // Normalize yaw to 0–360
@@ -302,55 +300,72 @@ public class Maneuvers {
 
         centerPlayer(player);
         railGrindSoundTicks.put(player.getUniqueId(), 29);
+        addRailGrindComboTask(player);
+        Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Grind"));
+    }
+
+    public static void stopRailGrinding(Player player) {
+        UUID uuid = player.getUniqueId();
+
+        player.removeMetadata("rail grind", nmlAcrobatics);
+        player.stopSound(Sound.ENTITY_MINECART_RIDING);
+        railGrindComboTasks.remove(uuid).cancel();
+        lastSuccessfulRailGrindDirection.remove(uuid);
+        lastDirectionChangeLocation.remove(uuid);
+        railGrindSpeed.remove(uuid);
     }
 
     public static void railJump(Player player, double speed) {
         Location particleLocation = railGrindParticleLocation.get(player.getUniqueId());
         Vector railJump = particleLocation.subtract(player.getLocation()).toVector().multiply(.12).setY(.55);
 
-        if (speed < 1) speed = 1;
-
-        player.setVelocity(new Vector());
-
-        double finalSpeed = speed;
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                player.setVelocity(railJump.multiply(finalSpeed));
-            }
-        }.runTaskLater(nmlAcrobatics, 1);
-
+        player.setVelocity(railJump.multiply(Math.max(1, speed)));
         EnergyManager.useEnergy(player, 5);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
         player.stopSound(Sound.ENTITY_MINECART_RIDING);
         player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
         player.removeMetadata("rail grind", nmlAcrobatics);
         postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 5, 1);
+        Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Jump"));
+    }
+
+    public static void addRailGrindComboTask(Player player) {
+        if (!railGrindComboTasks.containsKey(player.getUniqueId())) {
+            BukkitTask task = Bukkit.getScheduler().runTaskTimer(nmlAcrobatics, () -> Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Grind")), 39L, 39L);
+
+            railGrindComboTasks.put(player.getUniqueId(), task);
+        }
     }
 
     /// wall running methods
     public static void startWallRun(Player player, Vector wallCardinal) {
-        wallRunSpeeds.put(player.getUniqueId(), player.getVelocity().length());
-        wallRunTimes.put(player.getUniqueId(), 0);
-        wallCardinals.put(player.getUniqueId(), wallCardinal);
-        player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
-        player.setMetadata("wall run", new FixedMetadataValue(nmlAcrobatics, true));
-        player.setAllowFlight(true);
-        player.setFlying(true);
-        player.setFlySpeed(.04f);
-        EnergyManager.pauseEnergyRegen(player);
+        if (!wallRunSpeeds.containsKey(player.getUniqueId())) {
+            wallRunSpeeds.put(player.getUniqueId(), player.getVelocity().length());
+            wallRunTimes.put(player.getUniqueId(), 0);
+            wallCardinals.put(player.getUniqueId(), wallCardinal);
+            player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
+            player.setMetadata("wall run", new FixedMetadataValue(nmlAcrobatics, true));
+            player.setAllowFlight(true);
+            player.setFlying(true);
+            player.setFlySpeed(.04f);
+            EnergyManager.pauseEnergyRegen(player);
+            Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Wall Run"));
+        }
     }
 
     public static void startWallRun(Player player, Vector wallCardinal, double speed) {
-        wallRunSpeeds.put(player.getUniqueId(), speed);
-        wallRunTimes.put(player.getUniqueId(), 0);
-        wallCardinals.put(player.getUniqueId(), wallCardinal);
-        player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
-        player.setMetadata("wall run", new FixedMetadataValue(nmlAcrobatics, true));
-        player.setAllowFlight(true);
-        player.setFlying(true);
-        player.setFlySpeed(.04f);
-        EnergyManager.pauseEnergyRegen(player);
+        if (!wallRunSpeeds.containsKey(player.getUniqueId())) {
+            wallRunSpeeds.put(player.getUniqueId(), speed);
+            wallRunTimes.put(player.getUniqueId(), 0);
+            wallCardinals.put(player.getUniqueId(), wallCardinal);
+            player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
+            player.setMetadata("wall run", new FixedMetadataValue(nmlAcrobatics, true));
+            player.setAllowFlight(true);
+            player.setFlying(true);
+            player.setFlySpeed(.04f);
+            EnergyManager.pauseEnergyRegen(player);
+            Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Wall Run"));
+        }
     }
 
     public static void stopWallRunning(Player player) {
@@ -392,6 +407,7 @@ public class Maneuvers {
         EnergyManager.useEnergy(player, 5);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
         player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
+        Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Wall Jump"));
 
         // slightly different from the postJumpRunnable();
         new BukkitRunnable() {
@@ -511,17 +527,17 @@ public class Maneuvers {
                         Block rightTop = rightLoc.clone().add(0, 1, 0).getBlock();
                         Block rightBottom = rightLoc.getBlock();
 
-                        if (!leftTop.getType().isAir() && !leftBottom.getType().isAir()) {
+                        if (leftTop.isSolid() && leftBottom.isSolid()) {
                             startWallRun(player, snapToCardinal(left));
                             player.removeMetadata("long jump", nmlAcrobatics);
                             cancel();
                         }
-                        else if (!forwardTop.getType().isAir() && !forwardBottom.getType().isAir()) {
+                        else if (forwardTop.isSolid() && forwardBottom.isSolid()) {
                             startWallRun(player, snapToCardinal(forward));
                             player.removeMetadata("long jump", nmlAcrobatics);
                             cancel();
                         }
-                        else if (!rightTop.getType().isAir() && !rightBottom.getType().isAir()) {
+                        else if (rightTop.isSolid() && rightBottom.isSolid()) {
                             startWallRun(player, snapToCardinal(right));
                             player.removeMetadata("long jump", nmlAcrobatics);
                             cancel();
@@ -639,10 +655,6 @@ public class Maneuvers {
         blocks.removeIf(block -> block.getType().isAir());
 
         return !blocks.isEmpty();
-    }
-
-    private static boolean isFalling(Player player) {
-        return !player.isOnGround() && player.getVelocity().getY() < 0;
     }
 
     // i gave up halfway through and just used AI to debug this im sorry but its 2:27 AM
