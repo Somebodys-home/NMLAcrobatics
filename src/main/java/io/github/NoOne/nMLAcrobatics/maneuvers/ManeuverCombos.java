@@ -69,20 +69,22 @@ public class ManeuverCombos {
     public void startComboDepleteTask(Player player) {
         UUID uuid = player.getUniqueId();
 
-        BossBar comboBar = comboBars.get(uuid);
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(nmlAcrobatics, () -> { // actual task
-            if (comboBar.getProgress() == 0) { // combo is done
-                if (comboBar.getPlayers().contains(player)) {
-                    endCombo(player);
+        if (comboBars.containsKey(uuid)) {
+            BossBar comboBar = comboBars.get(uuid);
+            BukkitTask task = Bukkit.getScheduler().runTaskTimer(nmlAcrobatics, () -> { // actual task
+                if (comboBar.getProgress() == 0) { // combo is done
+                    if (comboBar.getPlayers().contains(player)) {
+                        endCombo(player);
+                    }
+
+                    return;
                 }
 
-                return;
-            }
+                comboBar.setProgress(Math.max(comboBar.getProgress() - .025, 0));
+            }, 0L, 1L);
 
-            comboBar.setProgress(Math.max(comboBar.getProgress() - .025, 0));
-        }, 0L, 1L);
-
-        ongoingDepletingComboTasks.put(uuid, task); // put the task on the hashmap
+            ongoingDepletingComboTasks.put(uuid, task); // put the task on the hashmap
+        }
     }
 
     public boolean alreadyStartedCombo(Player player) {

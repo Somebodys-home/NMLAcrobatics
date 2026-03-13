@@ -197,7 +197,7 @@ public class AcrobaticsListener implements Listener {
         Input input = event.getInput();
 
         if (player.hasMetadata("rail grind")) {
-            if (input.isJump()) {
+            if (input.isJump() && !player.hasMetadata("no jumping")) {
                 Maneuvers.stopRailGrinding(player);
 
                 new BukkitRunnable() {

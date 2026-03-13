@@ -303,6 +303,14 @@ public class Maneuvers {
         railGrindSoundTicks.put(player.getUniqueId(), 29);
         EnergyManager.pauseEnergyRegen(player);
         Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Grind"));
+        player.setMetadata("no jumping", new FixedMetadataValue(nmlAcrobatics, true));
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                player.removeMetadata("no jumping", nmlAcrobatics);
+            }
+        }.runTaskLater(nmlAcrobatics, 1);
     }
 
     public static void stopRailGrinding(Player player) {
