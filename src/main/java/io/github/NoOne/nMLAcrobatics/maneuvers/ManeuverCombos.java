@@ -1,11 +1,16 @@
 package io.github.NoOne.nMLAcrobatics.maneuvers;
 
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
+import io.github.NoOne.nMLSkills.skillSystem.SkillBars;
+import io.github.NoOne.nMLSkills.skillSystem.SkillChangeEvent;
 import org.bukkit.Bukkit;
+import org.bukkit.Sound;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
+import org.bukkit.metadata.FixedMetadataValue;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
@@ -32,11 +37,13 @@ public class ManeuverCombos {
     }
 
     public void startCombo(Player player, String startingManeuver) {
-        BossBar comboBar = Bukkit.createBossBar(startingManeuver, BarColor.WHITE, BarStyle.SOLID);
+        if (!player.hasMetadata("fishing_combo")) {
+            BossBar comboBar = Bukkit.createBossBar(startingManeuver, BarColor.WHITE, BarStyle.SOLID);
 
-        comboBars.put(player.getUniqueId(), comboBar);
-        maneuverCombos.put(player.getUniqueId(), new ArrayList<>(List.of(startingManeuver)));
-        startComboDepleteTask(player);
+            comboBars.put(player.getUniqueId(), comboBar);
+            maneuverCombos.put(player.getUniqueId(), new ArrayList<>(List.of(startingManeuver)));
+            startComboDepleteTask(player);
+        }
     }
 
     public void addToCombo(Player player, String maneuver) {
@@ -49,20 +56,25 @@ public class ManeuverCombos {
         maneuverCombos.get(player.getUniqueId()).add(maneuver);
         comboBar.setProgress(1);
         comboBar.setTitle(getComboTitleString(player));
-        ongoingDepletingComboTasks.remove(player.getUniqueId()).cancel();
-        startComboDepleteTask(player);
+
+        if (ongoingDepletingComboTasks.containsKey(player.getUniqueId())) {
+            ongoingDepletingComboTasks.remove(player.getUniqueId()).cancel();
+        }
+
+        if (!maneuver.equals("Rail Grind")) {
+            startComboDepleteTask(player);
+        }
     }
 
-    private void startComboDepleteTask(Player player) {
+    public void startComboDepleteTask(Player player) {
         UUID uuid = player.getUniqueId();
 
         BossBar comboBar = comboBars.get(uuid);
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(nmlAcrobatics, () -> { // actual task
-            if (comboBar.getProgress() == 0) { // combo is fully gone
-                maneuverCombos.remove(uuid);
-                comboBar.removePlayer(player);
-                comboBars.remove(uuid);
-                ongoingDepletingComboTasks.remove(uuid).cancel();
+            if (comboBar.getProgress() == 0) { // combo is done
+                if (comboBar.getPlayers().contains(player)) {
+                    endCombo(player);
+                }
 
                 return;
             }
@@ -82,12 +94,12 @@ public class ManeuverCombos {
         int comboAmount = maneuverCombo.size();
         String comboAmountColor;
         String comboTitle = "";
-        String previous = maneuverCombo.get(0);
+        String previous = maneuverCombo.getFirst();
         int count = 1;
 
-        if (comboAmount < 5) {
+        if (comboAmount < 10) {
             comboAmountColor = "§e";
-        } else if (comboAmount < 10) {
+        } else if (comboAmount < 20) {
             comboAmountColor = "§b";
         } else {
             comboAmountColor = "§d";
@@ -115,10 +127,89 @@ public class ManeuverCombos {
         return "(" + comboAmountColor + "§l" + comboAmount + "x§r) " + comboTitle;
     }
 
+    private void endCombo(Player player) {
+        UUID uuid = player.getUniqueId();
+        ArrayList<String> maneuverCombo = maneuverCombos.get(uuid);
+        int comboSize = maneuverCombo.size();
+        String comboTitle;
+        int totalRolls = 0;
+        int totalLongJumps = 0;
+        int totalRailGrinds = 0;
+        int totalWallRuns = 0;
+
+        // title
+        if (comboSize > 1) {
+            if (comboSize < 10) {
+                comboTitle = "§e" + comboSize + "x Combo";
+            } else if (comboSize < 20) {
+                comboTitle = "§b" + comboSize + "x Combo!";
+            } else {
+                comboTitle = "§d" + comboSize + "x COMBO!";
+            }
+        } else {
+            comboTitle = "";
+        }
+
+        // calculate exp gain
+        for (String string : maneuverCombo) {
+            switch (string) {
+                case "Roll", "Roll Brace" -> totalRolls++;
+                case "Long Jump", "Rail Jump", "Wall Jump" -> totalLongJumps++;
+                case "Rail Grind" -> totalRailGrinds++;
+                case "Wall Run" -> totalWallRuns++;
+            }
+        }
+
+        int expGain = totalRolls * 7 + totalLongJumps * 10 + totalRailGrinds * 25 + totalWallRuns * 30;
+            expGain += (int) Math.round((expGain / 2.0) * (comboSize / 100.0));
+            expGain /= 3; /// temporary
+        double expGainPerTick = Math.min(9, expGain / 20.0);
+        int ticks = (int) Math.ceil(expGain / expGainPerTick);
+
+        // actually finishing the combo
+        player.sendTitle(comboTitle, "§7 + " + expGain + " exp!", 5, 50, 5);
+        player.setMetadata("fishing_combo", new FixedMetadataValue(nmlAcrobatics, true));
+
+        int finalExpGain = expGain;
+        new BukkitRunnable() {
+            double expLeft = finalExpGain;
+
+            @Override
+            public void run() {
+                expLeft -= expGainPerTick;
+
+                if (expLeft <= 0) {
+                    expLeft = 0;
+                }
+
+                player.sendTitle(comboTitle, "§7 + " + Math.round(expLeft) + " exp!", 0, 30, 5);
+                player.playSound(player.getLocation(), Sound.BLOCK_WOODEN_BUTTON_CLICK_ON, 2f, 1f);
+
+                if (expLeft == 0) {
+                    player.removeMetadata("fishing_combo", nmlAcrobatics);
+                    cancel();
+                }
+            }
+        }.runTaskTimer(nmlAcrobatics, 15L, 1L);
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                Bukkit.getPluginManager().callEvent(new SkillChangeEvent(player, "acrobaticsexp", finalExpGain, ticks));
+            }
+        }.runTaskLater(nmlAcrobatics, 15L);
+
+        // clearing data
+        maneuverCombos.remove(uuid);
+        comboBars.remove(uuid).removePlayer(player);
+        ongoingDepletingComboTasks.remove(uuid).cancel();
+    }
+
     private String compactRepeats(String maneuver, int count) {
         if (count > 1) {
             return maneuver + " x" + count;
         }
+
         return maneuver;
     }
 }

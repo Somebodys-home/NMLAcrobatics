@@ -79,8 +79,7 @@
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLSkills</artifactId>
-            <version>3136351efd
-            </version>
+            <version>6e2b934194</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

@@ -56,30 +56,36 @@ public class AcrobaticsListener implements Listener {
             player.sendMessage("§fLv. §r§8" + prevlevel + " -> §r§b" + newlevel + " §r§fAcrobat");
             player.sendMessage("");
 
-            if (newlevel == 10) {
+            if (newlevel >= 10 && prevlevel < 10) {
                 player.sendMessage("§b§lMANEUVER LEARNED: LONG JUMP");
                 player.sendMessage("§8§o(Run + Shift + Jump)");
                 player.sendMessage("§f§oIt's a bigger jump! Neato!");
                 player.sendMessage("");
                 player.sendMessage("§7§oYou can view this maneuver in");
                 player.sendMessage("§7§othe §n/skills§r§7§o menu");
-            } else if (newlevel == 20) {
+                player.sendMessage("");
+            }
+
+            if (newlevel >= 20 && prevlevel < 20) {
                 player.sendMessage("§b§lMANEUVER LEARNED: RAIL GRIND");
                 player.sendMessage("§f§oGrind on rails after a long jump!");
                 player.sendMessage("");
                 player.sendMessage("§7§oYou can view this maneuver in");
                 player.sendMessage("§7§othe §n/skills§r§7§o menu");
-            } else if (newlevel == 30) {
-                player.sendMessage("§b§lMANEUVER LEARNED: WALL JUMP");
-                player.sendMessage("§f§oRun across walls!");
+                player.sendMessage("");
+            }
+
+            if (newlevel >= 30 && prevlevel < 30) {
+                player.sendMessage("§b§lMANEUVER LEARNED: WALL RUN");
+                player.sendMessage("§f§oRun across walls after a long jump!");
                 player.sendMessage("");
                 player.sendMessage("§7§oYou can view this maneuver in");
                 player.sendMessage("§7§othe §n/skills§r§7§o menu");
-            } else {
-                player.sendMessage("§7§lREWARDS:");
-                player.sendMessage("§8§o(Nothing yet lmao)");
+                player.sendMessage("");
             }
 
+            player.sendMessage("§7§lREWARDS:");
+            player.sendMessage("§8§o(Nothing yet lmao)");
             player.sendMessage("§f§l---------------------------");
 
             /// firework

@@ -5,6 +5,8 @@ import io.github.NoOne.nMLAcrobatics.maneuvers.Maneuvers;
 import io.github.NoOne.nMLPlayerStats.NMLPlayerStats;
 import io.github.NoOne.nMLSkills.NMLSkills;
 import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class NMLAcrobatics extends JavaPlugin {
@@ -30,6 +32,10 @@ public final class NMLAcrobatics extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.removeMetadata("fishing_combo", this);
+        }
+
         maneuvers.stopTasks();
         maneuverCombos.stop();
     }

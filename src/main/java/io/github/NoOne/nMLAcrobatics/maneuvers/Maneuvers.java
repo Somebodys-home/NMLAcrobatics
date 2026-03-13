@@ -26,7 +26,6 @@ public class Maneuvers {
     private static final HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
     private static final HashMap<UUID, Location> lastDirectionChangeLocation = new HashMap<>();
     private static final HashMap<UUID, Location> railGrindParticleLocation = new HashMap<>();
-    private static final HashMap<UUID, BukkitTask> railGrindComboTasks = new HashMap<>(); // just to keep up a combo while rail grinding
     private static final HashMap<UUID, Vector> wallCardinals = new HashMap<>(); // only to know where to push the player back to when on a wall
     private static final HashMap<UUID, Double> wallRunSpeeds = new HashMap<>(); // speed that you start wall running at
     private static final HashMap<UUID, Integer> wallRunTimes = new HashMap<>(); // the amount of time that you spend wall running
@@ -67,7 +66,9 @@ public class Maneuvers {
                     }
                 }
 
-                if (soundUUIDs.isEmpty()) soundTicks = 31;
+                if (soundUUIDs.isEmpty()) {
+                    soundTicks = 31;
+                }
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (player.hasMetadata("rail grind")) {
@@ -242,7 +243,7 @@ public class Maneuvers {
             Vector roll = movement.normalize().multiply(2);
 
             player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-            EnergyManager.useEnergy(player, 1); /// testing purposes
+            EnergyManager.useEnergy(player, 10);
             CooldownManager.putAllAbilitiesOnCooldown(player, 1.5);
             player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
             player.setVelocity(roll);
@@ -271,7 +272,7 @@ public class Maneuvers {
         double speed = longJump.length();
 
         player.setVelocity(longJump);
-        EnergyManager.useEnergy(player, 1); /// testing purposes
+        EnergyManager.useEnergy(player, 15);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
         player.stopSound(Sound.ENTITY_MINECART_RIDING);
         player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
@@ -300,19 +301,21 @@ public class Maneuvers {
 
         centerPlayer(player);
         railGrindSoundTicks.put(player.getUniqueId(), 29);
-        addRailGrindComboTask(player);
+        EnergyManager.pauseEnergyRegen(player);
         Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Grind"));
     }
 
     public static void stopRailGrinding(Player player) {
         UUID uuid = player.getUniqueId();
+        ManeuverCombos maneuverCombos = nmlAcrobatics.getManeuverCombos();
 
         player.removeMetadata("rail grind", nmlAcrobatics);
         player.stopSound(Sound.ENTITY_MINECART_RIDING);
-        railGrindComboTasks.remove(uuid).cancel();
         lastSuccessfulRailGrindDirection.remove(uuid);
         lastDirectionChangeLocation.remove(uuid);
         railGrindSpeed.remove(uuid);
+        maneuverCombos.startComboDepleteTask(player);
+        EnergyManager.resumeEnergyRegen(player);
     }
 
     public static void railJump(Player player, double speed) {
@@ -320,21 +323,13 @@ public class Maneuvers {
         Vector railJump = particleLocation.subtract(player.getLocation()).toVector().multiply(.12).setY(.55);
 
         player.setVelocity(railJump.multiply(Math.max(1, speed)));
-        EnergyManager.useEnergy(player, 5);
+        EnergyManager.useEnergy(player, 10);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
         player.stopSound(Sound.ENTITY_MINECART_RIDING);
         player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
         player.removeMetadata("rail grind", nmlAcrobatics);
         postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 5, 1);
         Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Jump"));
-    }
-
-    public static void addRailGrindComboTask(Player player) {
-        if (!railGrindComboTasks.containsKey(player.getUniqueId())) {
-            BukkitTask task = Bukkit.getScheduler().runTaskTimer(nmlAcrobatics, () -> Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Grind")), 39L, 39L);
-
-            railGrindComboTasks.put(player.getUniqueId(), task);
-        }
     }
 
     /// wall running methods
