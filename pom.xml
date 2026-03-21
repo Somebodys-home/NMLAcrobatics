@@ -84,8 +84,8 @@
         </dependency>
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
-            <artifactId>ExpertiseStylePlugin</artifactId>
-            <version>c8ed89bb03</version>
+            <artifactId>NMLAbilities</artifactId>
+            <version>22bf97c9cc</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

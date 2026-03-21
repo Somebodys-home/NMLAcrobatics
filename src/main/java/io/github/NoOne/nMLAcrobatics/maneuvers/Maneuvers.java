@@ -1,6 +1,6 @@
 package io.github.NoOne.nMLAcrobatics.maneuvers;
 
-import io.github.NoOne.expertiseStylePlugin.abilitySystem.cooldownSystem.CooldownManager;
+import io.github.NoOne.nMLAbilities.abilitySystem.cooldownSystem.CooldownManager;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import io.github.NoOne.nMLEnergySystem.EnergyManager;
 import org.bukkit.*;
@@ -244,7 +244,7 @@ public class Maneuvers {
 
             player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
             EnergyManager.useEnergy(player, 10);
-            CooldownManager.putAllAbilitiesOnCooldown(player, 1.5);
+            CooldownManager.putOnHardCooldown(player, 1.5);
             player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
             player.setVelocity(roll);
             Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Roll"));
@@ -264,6 +264,15 @@ public class Maneuvers {
         player.setVelocity(roll);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
         Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Roll Brace"));
+        CooldownManager.putOnHardCooldown(player, 1.5);
+        player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                player.removeMetadata("roll cooldown", nmlAcrobatics);
+            }
+        }.runTaskLater(nmlAcrobatics, 30);
     }
 
     /// long jump methods

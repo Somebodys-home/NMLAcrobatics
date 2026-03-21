@@ -4,3 +4,6 @@ main: io.github.NoOne.nMLAcrobatics.NMLAcrobatics
 api-version: '1.21'
 depend:
   - NMLSkills
+  - NMLAbilities
+  - NMLEnergySystem
+  - NMLPlayerStats

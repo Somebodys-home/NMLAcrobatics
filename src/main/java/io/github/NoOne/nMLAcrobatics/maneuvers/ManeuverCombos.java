@@ -40,6 +40,8 @@ public class ManeuverCombos {
         if (!player.hasMetadata("fishing_combo")) {
             BossBar comboBar = Bukkit.createBossBar(startingManeuver, BarColor.WHITE, BarStyle.SOLID);
 
+            comboBar.addPlayer(player);
+            comboBar.setVisible(false);
             comboBars.put(player.getUniqueId(), comboBar);
             maneuverCombos.put(player.getUniqueId(), new ArrayList<>(List.of(startingManeuver)));
             startComboDepleteTask(player);
@@ -49,8 +51,8 @@ public class ManeuverCombos {
     public void addToCombo(Player player, String maneuver) {
         BossBar comboBar = comboBars.get(player.getUniqueId());
 
-        if (!comboBar.getPlayers().contains(player)) {
-            comboBar.addPlayer(player);
+        if (!comboBar.isVisible()) {
+            comboBar.setVisible(true);
         }
 
         maneuverCombos.get(player.getUniqueId()).add(maneuver);
@@ -73,10 +75,13 @@ public class ManeuverCombos {
             BossBar comboBar = comboBars.get(uuid);
             BukkitTask task = Bukkit.getScheduler().runTaskTimer(nmlAcrobatics, () -> { // actual task
                 if (comboBar.getProgress() == 0) { // combo is done
-                    if (comboBar.getPlayers().contains(player)) {
+                    if (comboBar.isVisible()) {
                         endCombo(player);
                     }
 
+                    maneuverCombos.remove(uuid);
+                    comboBars.remove(uuid).removePlayer(player);
+                    ongoingDepletingComboTasks.remove(uuid).cancel();
                     return;
                 }
 
@@ -201,10 +206,6 @@ public class ManeuverCombos {
             }
         }.runTaskLater(nmlAcrobatics, 15L);
 
-        // clearing data
-        maneuverCombos.remove(uuid);
-        comboBars.remove(uuid).removePlayer(player);
-        ongoingDepletingComboTasks.remove(uuid).cancel();
     }
 
     private String compactRepeats(String maneuver, int count) {

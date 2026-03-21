@@ -1,7 +1,6 @@
 package io.github.NoOne.nMLAcrobatics;
 
 import com.destroystokyo.paper.event.player.PlayerJumpEvent;
-import io.github.NoOne.expertiseStylePlugin.abilitySystem.cooldownSystem.CooldownManager;
 import io.github.NoOne.nMLAcrobatics.maneuvers.ManeuverCombos;
 import io.github.NoOne.nMLAcrobatics.maneuvers.Maneuvers;
 import io.github.NoOne.nMLAcrobatics.maneuvers.PerformedManeuverEvent;
@@ -149,15 +148,6 @@ public class AcrobaticsListener implements Listener {
             if (player.hasMetadata("roll brace")) {
                 event.setDamage(event.getDamage() / 2);
                 Maneuvers.rollBrace(player);
-                CooldownManager.putAllAbilitiesOnCooldown(player, 1.5);
-                player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
-
-                new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        player.removeMetadata("roll cooldown", nmlAcrobatics);
-                    }
-                }.runTaskLater(nmlAcrobatics, 30);
             }
         }
     }
