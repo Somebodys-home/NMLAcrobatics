@@ -1,8 +1,9 @@
 package io.github.NoOne.nMLAcrobatics.maneuvers;
 
-import io.github.NoOne.nMLAbilities.abilitySystem.cooldownSystem.CooldownManager;
+import io.github.NoOne.nMLAbilities.abilitySystem.cooldown.CooldownManager;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import io.github.NoOne.nMLEnergySystem.EnergyManager;
+import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -73,6 +74,7 @@ public class Maneuvers {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (player.hasMetadata("rail grind")) {
                         UUID uuid = player.getUniqueId();
+                        Stats stats = nmlAcrobatics.getProfileManager().getPlayerProfile(uuid).getStats();
                         Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
 
                         if (isGrindable(below)) {
@@ -82,9 +84,17 @@ public class Maneuvers {
                             boolean ableToSwitchDirection = true;
                             String newDirection = null;
                             Vector velocity = null;
+                            double speedMultiplier = stats.getSpeed() / 100.0;
+                            Location particleLocation = calculateRailJumpLandingPosition(player, speedMultiplier);
+                            Particle.DustOptions particleDust;
 
-                            Location particleLocation = calculateRailJumpLandingPosition(player);
-                            Particle.DustOptions fuchsia = new Particle.DustOptions(Color.FUCHSIA, 1.0F);
+                            if (speedMultiplier < 1) {
+                                particleDust = new Particle.DustOptions(Color.RED, 1.0F);
+                            } else if (speedMultiplier < 1.3) {
+                                particleDust = new Particle.DustOptions(Color.FUCHSIA, 1.0F);
+                            } else {
+                                particleDust = new Particle.DustOptions(Color.AQUA, 1.0F);
+                            }
 
                             Block base = player.getLocation().getBlock();
                             Block northBlock = base.getRelative(BlockFace.NORTH).getRelative(BlockFace.DOWN);
@@ -133,14 +143,17 @@ public class Maneuvers {
 
                             // particle helper
                             if (!particleLocation.getBlock().getType().isAir()) {
-                                List<Location> particleWireFrame = createHollowCube(particleLocation.clone().add(.5, .5, .5),
-                                        particleLocation.clone().add(-.5, -.5, -.5), .25);
+                                List<Location> particleWireFrame = createHollowCube(
+                                        particleLocation.clone().add(.5, .5, .5),
+                                        particleLocation.clone().add(-.5, -.5, -.5),
+                                        .25
+                                );
 
                                 for (Location location : particleWireFrame) {
-                                    player.getWorld().spawnParticle(Particle.DUST, location, 1, 0, 0, 0, fuchsia);
+                                    player.getWorld().spawnParticle(Particle.DUST, location, 1, 0, 0, 0, particleDust);
                                 }
                             } else {
-                                player.getWorld().spawnParticle(Particle.DUST, particleLocation, 1, 0, 0, 0, fuchsia);
+                                player.getWorld().spawnParticle(Particle.DUST, particleLocation, 1, 0, 0, 0, particleDust);
                             }
 
                             railGrindParticleLocation.put(uuid, particleLocation);
@@ -170,8 +183,8 @@ public class Maneuvers {
                         wallRunTimes.put(uuid, wallRunTimes.get(uuid) + 1);
 
                         Vector climbCardinal = getClosestWallCardinal(player);
-                        double currentEnergy = nmlAcrobatics.getNmlPlayerStats().getProfileManager().getPlayerProfile(uuid).getStats().getCurrentEnergy();
-                        double energyMinimum = nmlAcrobatics.getNmlPlayerStats().getProfileManager().getPlayerProfile(uuid).getStats().getMaxEnergy() / 20;
+                        double currentEnergy = nmlAcrobatics.getProfileManager().getPlayerProfile(uuid).getStats().getCurrentEnergy();
+                        double energyMinimum = nmlAcrobatics.getProfileManager().getPlayerProfile(uuid).getStats().getMaxEnergy() / 20;
                         double speed = wallRunSpeeds.get(uuid);
 
                         if (climbCardinal == null) {
@@ -229,7 +242,6 @@ public class Maneuvers {
         wallRunTask.cancel();
     }
 
-    /// roll methods
     public static void roll(Player player) {
         UUID id = player.getUniqueId();
         Location last = lastLocations.get(id);
@@ -240,7 +252,8 @@ public class Maneuvers {
         Vector movement = now.toVector().subtract(last.toVector());
 
         if (movement.lengthSquared() > 0.01) {
-            Vector roll = movement.normalize().multiply(2);
+            double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
+            Vector roll = movement.normalize().multiply(2).multiply(speedMultiplier);
 
             player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
             EnergyManager.useEnergy(player, 10);
@@ -259,7 +272,8 @@ public class Maneuvers {
     }
 
     public static void rollBrace(Player player) {
-        Vector roll = player.getLocation().getDirection().normalize().multiply(3);
+        double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
+        Vector roll = player.getLocation().getDirection().normalize().multiply(3).multiply(speedMultiplier);
 
         player.setVelocity(roll);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
@@ -275,9 +289,9 @@ public class Maneuvers {
         }.runTaskLater(nmlAcrobatics, 30);
     }
 
-    /// long jump methods
     public static void longJump(Player player) {
-        Vector longJump = player.getLocation().getDirection().normalize().multiply(1.2).setY(.5);
+        double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
+        Vector longJump = player.getLocation().getDirection().normalize().multiply(.9).multiply(speedMultiplier).setY(.5);
         double speed = longJump.length();
 
         player.setVelocity(longJump);
@@ -289,8 +303,7 @@ public class Maneuvers {
         postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
-    /// rail grind methods
-    private static void railGrind(Player player, double speed) {
+    public static void railGrind(Player player, double speed) {
         player.setMetadata("rail grind", new FixedMetadataValue(nmlAcrobatics, true));
         railGrindSpeed.put(player.getUniqueId(), speed);
         player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
@@ -349,7 +362,6 @@ public class Maneuvers {
         Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Jump"));
     }
 
-    /// wall running methods
     public static void startWallRun(Player player, Vector wallCardinal) {
         if (!wallRunSpeeds.containsKey(player.getUniqueId())) {
             wallRunSpeeds.put(player.getUniqueId(), player.getVelocity().length());
@@ -404,6 +416,7 @@ public class Maneuvers {
     public static void wallJump(Player player) {
         double speed = wallRunSpeeds.get(player.getUniqueId());
         Vector reverseWallCardinal = reverseWallCardinal(wallCardinals.get(player.getUniqueId()));
+        double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
         Vector wallJump;
 
         // vector changes depending on if the player is looking at the wall before jumping
@@ -413,6 +426,7 @@ public class Maneuvers {
             wallJump = new Vector(0, .5, 0);
         }
 
+        wallJump.multiply(speedMultiplier);
         stopWallRunning(player);
         player.setVelocity(wallJump);
         EnergyManager.resumeEnergyRegen(player);
@@ -485,7 +499,6 @@ public class Maneuvers {
         }.runTaskTimer(nmlAcrobatics, 10, 1);
     }
 
-    /// misc. methods
     private static void centerPlayer(Player player) {
         Location loc = player.getLocation();
         float yaw = player.getLocation().getYaw();
@@ -494,7 +507,7 @@ public class Maneuvers {
         loc.setX(loc.getBlockX() + 0.5);
         loc.setY(loc.getBlockY()); // keep current Y
         loc.setZ(loc.getBlockZ() + 0.5);
-        loc.setYaw(yaw);   // keep facing the same way
+        loc.setYaw(yaw); // keep facing the same way
         loc.setPitch(pitch);
 
         player.teleport(loc.add(0, .5, 0));
@@ -560,7 +573,25 @@ public class Maneuvers {
         };
     }
 
-    public List<Location> createHollowCube(Location corner1, Location corner2, double particleDistance) {
+    private static Block getTopBlock(Player player, double distance) {
+        Vector top = player.getLocation().getDirection().setY(0).normalize().multiply(distance);
+        Location topLocation = player.getLocation().clone().add(top).add(0, 1.75, 0);
+
+        return topLocation.getBlock();
+    }
+
+    private static Location calculateRailJumpLandingPosition(Player player, double speedMultiplier) {
+        Location playerLocation = player.getLocation();
+        Vector playerDirection = playerLocation.getDirection();
+        double y = playerLocation.getY() - 1;
+        double pitch = playerLocation.getPitch();
+        double multiplier = (((-1/540.0) * Math.pow(pitch, 2)) + ((1/90.0) * pitch) + 14) * speedMultiplier;
+
+        playerLocation.add(playerDirection.multiply(multiplier)).setY(y);
+        return playerLocation;
+    }
+
+    private static List<Location> createHollowCube(Location corner1, Location corner2, double particleDistance) {
         List<Location> result = new ArrayList<>();
         World world = corner1.getWorld();
         double minX = Math.min(corner1.getX(), corner2.getX());
@@ -585,28 +616,6 @@ public class Maneuvers {
         }
 
         return result;
-    }
-
-    private static boolean isGrindable(Block block) {
-        return block.getType() == Material.OAK_FENCE || block.getType() == Material.OAK_FENCE_GATE ||
-                block.getType() == Material.SPRUCE_FENCE || block.getType() == Material.SPRUCE_FENCE_GATE ||
-                block.getType() == Material.BIRCH_FENCE || block.getType() == Material.BIRCH_FENCE_GATE ||
-                block.getType() == Material.JUNGLE_FENCE || block.getType() == Material.JUNGLE_FENCE_GATE ||
-                block.getType() == Material.ACACIA_FENCE || block.getType() == Material.ACACIA_FENCE_GATE ||
-                block.getType() == Material.DARK_OAK_FENCE || block.getType() == Material.DARK_OAK_FENCE_GATE ||
-                block.getType() == Material.MANGROVE_FENCE || block.getType() == Material.MANGROVE_FENCE_GATE ||
-                block.getType() == Material.CHERRY_FENCE || block.getType() == Material.CHERRY_FENCE_GATE ||
-                block.getType() == Material.BAMBOO_FENCE || block.getType() == Material.BAMBOO_FENCE_GATE ||
-                block.getType() == Material.CRIMSON_FENCE || block.getType() == Material.CRIMSON_FENCE_GATE ||
-                block.getType() == Material.WARPED_FENCE || block.getType() == Material.WARPED_FENCE_GATE ||
-                block.getType() == Material.NETHER_BRICK_FENCE || block.getType() == Material.IRON_BARS;
-    }
-
-    public static Block getTopBlock(Player player, double distance) {
-        Vector top = player.getLocation().getDirection().setY(0).normalize().multiply(distance);
-        Location topLocation = player.getLocation().clone().add(top).add(0, 1.75, 0);
-
-        return topLocation.getBlock();
     }
 
     private static Vector getClosestWallCardinal(Player player) {
@@ -652,7 +661,7 @@ public class Maneuvers {
         }
     }
 
-    public static boolean hasNeighboringBlocks(Location loc) {
+    private static boolean hasNeighboringBlocks(Location loc) {
         ArrayList<Block> blocks = new ArrayList<>();
         World world = loc.getWorld();
 
@@ -669,85 +678,18 @@ public class Maneuvers {
         return !blocks.isEmpty();
     }
 
-    // i gave up halfway through and just used AI to debug this im sorry but its 2:27 AM
-    // i'm not as strong a man when i dont have enough sleep and i just wanted to get this done
-    // i have a broken ukulele if that's whatchu want outta me
-    public static Location calculateRailJumpLandingPosition(Player player) {
-        Location startLoc = player.getLocation().clone();
-        double startY = startLoc.getY();
-        Location simLoc = startLoc.clone().add(0, 0.1, 0); // same as before
-
-        World world = player.getWorld();
-
-        // EXACT same initial velocity expression you used originally
-        Vector v = player.getLocation().getDirection().clone().normalize().multiply(1.5);
-        v.setY(0.5);
-
-        final double g = 0.08;
-        final double d = 0.93;
-        final int MAX_TICKS = 1000;
-        final double EPS = 1e-9;
-
-        double v0x = v.getX();
-        double v0y = v.getY();
-        double v0z = v.getZ();
-
-        // iterate ticks using closed-form sums to avoid integration bias
-        for (int n = 0; n < MAX_TICKS; n++) {
-            double dPowN = Math.pow(d, n);                 // d^n
-            double oneMinusDPowN = 1.0 - dPowN;
-            double denom = 1.0 - d;                        // (1 - d)
-
-            double sumX = (denom == 0.0) ? v0x * n : v0x * (oneMinusDPowN / denom);
-            double sumZ = (denom == 0.0) ? v0z * n : v0z * (oneMinusDPowN / denom);
-
-            double term1 = (denom == 0.0) ? v0y * n : v0y * (oneMinusDPowN / denom);
-            double term2 = (g * d / denom) * ( n - (oneMinusDPowN / denom) );
-            double deltaY = term1 - term2;
-            double yAfterN = simLoc.getY() + deltaY;
-
-            double vAtN_y = v0y * dPowN - (g * d * (1.0 - dPowN) / (1.0 - d));
-            double vAtN_x = v0x * dPowN;
-            double vAtN_z = v0z * dPowN;
-
-            // check if this tick will cross startY
-            if (yAfterN + vAtN_y <= startY + EPS) {
-                double t;
-                if (Math.abs(vAtN_y) < EPS) {
-                    t = 0.0;
-                } else {
-                    t = (startY - yAfterN) / vAtN_y;
-                    if (Double.isNaN(t) || Double.isInfinite(t)) t = 0.0;
-                }
-                t = Math.max(0.0, Math.min(1.0, t));
-
-                double x = simLoc.getX() + sumX + t * vAtN_x;
-                double z = simLoc.getZ() + sumZ + t * vAtN_z;
-
-                // ---- EMPIRICAL FIX: extend horizontal by +1 block along travel direction ----
-                double dx = x - startLoc.getX();
-                double dz = z - startLoc.getZ();
-                double horizDist = Math.sqrt(dx * dx + dz * dz);
-                if (horizDist > 1e-6) {
-                    double correction = 1.0; // 1 block forward correction (tweak if necessary)
-                    x += (dx / horizDist) * correction;
-                    z += (dz / horizDist) * correction;
-                }
-                // return with your requested -1 Y offset
-                return new Location(world, x, startY - 1, z);
-            }
-        }
-
-        // fallback: extend last sim location horizontally by +1 block as well
-        double fx = simLoc.getX();
-        double fz = simLoc.getZ();
-        double ddx = fx - startLoc.getX();
-        double ddz = fz - startLoc.getZ();
-        double fDist = Math.sqrt(ddx * ddx + ddz * ddz);
-        if (fDist > 1e-6) {
-            fx += (ddx / fDist);
-            fz += (ddz / fDist);
-        }
-        return new Location(world, fx, startY - 1, fz);
+    private static boolean isGrindable(Block block) {
+        return block.getType() == Material.OAK_FENCE || block.getType() == Material.OAK_FENCE_GATE ||
+                block.getType() == Material.SPRUCE_FENCE || block.getType() == Material.SPRUCE_FENCE_GATE ||
+                block.getType() == Material.BIRCH_FENCE || block.getType() == Material.BIRCH_FENCE_GATE ||
+                block.getType() == Material.JUNGLE_FENCE || block.getType() == Material.JUNGLE_FENCE_GATE ||
+                block.getType() == Material.ACACIA_FENCE || block.getType() == Material.ACACIA_FENCE_GATE ||
+                block.getType() == Material.DARK_OAK_FENCE || block.getType() == Material.DARK_OAK_FENCE_GATE ||
+                block.getType() == Material.MANGROVE_FENCE || block.getType() == Material.MANGROVE_FENCE_GATE ||
+                block.getType() == Material.CHERRY_FENCE || block.getType() == Material.CHERRY_FENCE_GATE ||
+                block.getType() == Material.BAMBOO_FENCE || block.getType() == Material.BAMBOO_FENCE_GATE ||
+                block.getType() == Material.CRIMSON_FENCE || block.getType() == Material.CRIMSON_FENCE_GATE ||
+                block.getType() == Material.WARPED_FENCE || block.getType() == Material.WARPED_FENCE_GATE ||
+                block.getType() == Material.NETHER_BRICK_FENCE || block.getType() == Material.IRON_BARS;
     }
 }

@@ -85,7 +85,7 @@
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLAbilities</artifactId>
-            <version>22bf97c9cc</version>
+            <version>b0022cb05b</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -97,7 +97,7 @@
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLPlayerStats</artifactId>
-            <version>ebafde7799</version>
+            <version>8ee70576fd</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

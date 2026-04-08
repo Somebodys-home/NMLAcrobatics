@@ -4,13 +4,13 @@ import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import io.github.NoOne.nMLAcrobatics.maneuvers.ManeuverCombos;
 import io.github.NoOne.nMLAcrobatics.maneuvers.Maneuvers;
 import io.github.NoOne.nMLAcrobatics.maneuvers.PerformedManeuverEvent;
+import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
+import io.github.NoOne.nMLPlayerStats.statSystem.StatChangeEvent;
+import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
 import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
 import io.github.NoOne.nMLSkills.skillSystem.SkillChangeEvent;
 import io.github.NoOne.nMLSkills.skillSystem.Skills;
-import org.bukkit.Color;
-import org.bukkit.FireworkEffect;
-import org.bukkit.Input;
-import org.bukkit.Sound;
+import org.bukkit.*;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
@@ -30,12 +30,14 @@ import java.util.UUID;
 public class AcrobaticsListener implements Listener {
     private final NMLAcrobatics nmlAcrobatics;
     private final SkillSetManager skillSetManager;
+    private final ProfileManager profileManager;
     private static final HashMap<UUID, Long> lastSneakToggle = new HashMap<>();
     private static final long inputThreshold = 300;
 
     public AcrobaticsListener(NMLAcrobatics nmlAcrobatics) {
         this.nmlAcrobatics = nmlAcrobatics;
         skillSetManager = nmlAcrobatics.getSkillSetManager();
+        profileManager = nmlAcrobatics.getProfileManager();
     }
 
     @EventHandler
@@ -43,6 +45,7 @@ public class AcrobaticsListener implements Listener {
         if (event.getChange() > 0 && event.getSkill().equals("acrobatics")) {
             Player player = event.getPlayer();
             Skills skills = skillSetManager.getSkillSet(player.getUniqueId()).getSkills();
+            Stats stats = profileManager.getPlayerProfile(player.getUniqueId()).getStats();
             int change = (int) event.getChange();
             int prevlevel = Math.max(skills.getAcrobaticsLevel() - change, 1);
             int newlevel = skills.getAcrobaticsLevel();
@@ -83,8 +86,18 @@ public class AcrobaticsListener implements Listener {
                 player.sendMessage("");
             }
 
-            player.sendMessage("§7§lREWARDS:");
-            player.sendMessage("§8§o(Nothing yet lmao)");
+            if (newlevel % 2 == 0) {
+                int speedChange = Math.max((newlevel - prevlevel) / 2, 1);
+
+                if (prevlevel < 2 && newlevel >= 2) {
+                    speedChange++;
+                }
+
+                player.sendMessage("§7§lREWARDS:");
+                player.sendMessage("§8" + stats.getSpeed() + " -> §r§f" + (stats.getSpeed() + speedChange) + " §r§fSpeed ✦ §r§b(+" + speedChange + ")");
+                Bukkit.getPluginManager().callEvent(new StatChangeEvent(player, "speed", speedChange));
+            }
+
             player.sendMessage("§f§l---------------------------");
 
             /// firework

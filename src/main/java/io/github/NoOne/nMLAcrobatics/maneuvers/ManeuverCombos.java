@@ -136,6 +136,11 @@ public class ManeuverCombos {
 
     private void endCombo(Player player) {
         UUID uuid = player.getUniqueId();
+
+        if (!maneuverCombos.containsKey(uuid)) {
+            return;
+        }
+
         ArrayList<String> maneuverCombo = maneuverCombos.get(uuid);
         int comboSize = maneuverCombo.size();
         String comboTitle;
