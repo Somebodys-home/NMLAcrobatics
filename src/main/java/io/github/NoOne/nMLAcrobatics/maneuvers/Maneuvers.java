@@ -85,7 +85,7 @@ public class Maneuvers {
                             String newDirection = null;
                             Vector velocity = null;
                             double speedMultiplier = stats.getSpeed() / 100.0;
-                            Location particleLocation = calculateRailJumpLandingPosition(player, speedMultiplier);
+                            Location railJumpLandingPosition = calculateRailJumpLandingPosition(player, speedMultiplier);
                             Particle.DustOptions particleDust;
 
                             if (speedMultiplier < 1) {
@@ -142,10 +142,10 @@ public class Maneuvers {
                             }
 
                             // particle helper
-                            if (!particleLocation.getBlock().getType().isAir()) {
+                            if (!railJumpLandingPosition.getBlock().getType().isAir()) {
                                 List<Location> particleWireFrame = createHollowCube(
-                                        particleLocation.clone().add(.5, .5, .5),
-                                        particleLocation.clone().add(-.5, -.5, -.5),
+                                        railJumpLandingPosition.clone().add(.5, .5, .5),
+                                        railJumpLandingPosition.clone().add(-.5, -.5, -.5),
                                         .25
                                 );
 
@@ -153,10 +153,10 @@ public class Maneuvers {
                                     player.getWorld().spawnParticle(Particle.DUST, location, 1, 0, 0, 0, particleDust);
                                 }
                             } else {
-                                player.getWorld().spawnParticle(Particle.DUST, particleLocation, 1, 0, 0, 0, particleDust);
+                                player.getWorld().spawnParticle(Particle.DUST, railJumpLandingPosition, 1, 0, 0, 0, particleDust);
                             }
 
-                            railGrindParticleLocation.put(uuid, particleLocation);
+                            railGrindParticleLocation.put(uuid, railJumpLandingPosition);
                             railGrindSoundTicks.put(uuid, soundTicks);
                         } else {
                             stopRailGrinding(player);
@@ -585,7 +585,7 @@ public class Maneuvers {
         Vector playerDirection = playerLocation.getDirection();
         double y = playerLocation.getY() - 1;
         double pitch = playerLocation.getPitch();
-        double multiplier = (((-1/540.0) * Math.pow(pitch, 2)) + ((1/90.0) * pitch) + 14) * speedMultiplier;
+        double multiplier = (((-1 / 540.0) * Math.pow(pitch, 2)) + ((1 / 90.0) * pitch) + 10) * speedMultiplier;
 
         playerLocation.add(playerDirection.multiply(multiplier)).setY(y);
         return playerLocation;
