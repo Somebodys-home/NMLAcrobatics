@@ -79,13 +79,13 @@
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLSkills</artifactId>
-            <version>6e2b934194</version>
+            <version>b230925a77</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLAbilities</artifactId>
-            <version>b0022cb05b</version>
+            <version>5a7ca8b06b</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
