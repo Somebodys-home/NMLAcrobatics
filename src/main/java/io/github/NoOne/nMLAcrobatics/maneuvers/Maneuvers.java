@@ -18,10 +18,9 @@ import java.util.*;
 public class Maneuvers {
     private static NMLAcrobatics nmlAcrobatics;
     private BukkitTask railGrindTask;
-    private BukkitTask rollTask;
+    private BukkitTask locationTracker;
     private BukkitTask wallRunTask;
-    private static final HashMap<UUID, Location> lastLocations = new HashMap<>(); // what
-    private static final HashMap<UUID, Location> currentLocations = new HashMap<>();
+    private static final HashMap<UUID, Location> previousLocations = new HashMap<>();
     private static final HashMap<UUID, Double> railGrindSpeed = new HashMap<>();
     private static final HashMap<UUID, Integer> railGrindSoundTicks = new HashMap<>();
     private static final HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
@@ -35,22 +34,18 @@ public class Maneuvers {
         Maneuvers.nmlAcrobatics = nmlAcrobatics;
     }
 
-    public void rollTask() {
-        rollTask = new BukkitRunnable() {
+    public void startLocationTracker() {
+        locationTracker = new BukkitRunnable() {
             @Override
             public void run() {
                 for (Player player : Bukkit.getOnlinePlayers()) {
-                    UUID id = player.getUniqueId();
-
-                    if (currentLocations.containsKey(id)) lastLocations.put(id, currentLocations.get(id));
-
-                    currentLocations.put(id, player.getLocation().clone());
+                    previousLocations.put(player.getUniqueId(), player.getLocation());
                 }
             }
-        }.runTaskTimer(nmlAcrobatics, 0, 2);
+        }.runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
-    public void railGrindTask() {
+    public void startRailGrindTask() {
         railGrindTask = new BukkitRunnable() {
             int soundTicks = 0;
 
@@ -167,7 +162,7 @@ public class Maneuvers {
         }.runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
-    public void wallRunTask() {
+    public void startWallRunTask() {
         wallRunTask = new BukkitRunnable() {
             int tickCounter = 0;
 
@@ -238,18 +233,18 @@ public class Maneuvers {
 
     public void stopTasks() {
         railGrindTask.cancel();
-        rollTask.cancel();
+        locationTracker.cancel();
         wallRunTask.cancel();
     }
 
     public static void roll(Player player) {
         UUID id = player.getUniqueId();
-        Location last = lastLocations.get(id);
-        Location now = currentLocations.get(id);
+        Location last = previousLocations.get(id);
+        Location currentLocation = player.getLocation();
 
-        if (last == null || now == null) return;
+        if (last == null) return;
 
-        Vector movement = now.toVector().subtract(last.toVector());
+        Vector movement = currentLocation.toVector().subtract(last.toVector());
 
         if (movement.lengthSquared() > 0.01) {
             double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
@@ -497,6 +492,10 @@ public class Maneuvers {
                 }
             }
         }.runTaskTimer(nmlAcrobatics, 10, 1);
+    }
+
+    public static double getSpeed(Player player) { // used in NMLAbilities
+        return previousLocations.get(player.getUniqueId()).distance(player.getLocation()) * 20;
     }
 
     private static void centerPlayer(Player player) {

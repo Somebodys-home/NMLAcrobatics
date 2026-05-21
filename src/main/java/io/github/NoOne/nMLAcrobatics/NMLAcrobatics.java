@@ -22,9 +22,9 @@ public final class NMLAcrobatics extends JavaPlugin {
         skillSetManager = JavaPlugin.getPlugin(NMLSkills.class).getSkillSetManager();
 
         maneuvers = new Maneuvers(this);
-        maneuvers.rollTask();
-        maneuvers.railGrindTask();
-        maneuvers.wallRunTask();
+        maneuvers.startLocationTracker();
+        maneuvers.startRailGrindTask();
+        maneuvers.startWallRunTask();
 
         maneuverCombos = new ManeuverCombos(this);
 
