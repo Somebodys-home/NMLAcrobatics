@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Hotswap" type="JarApplication">
+    <option name="JAR_PATH" value="$PROJECT_DIR$/../../paper.jar" />
+    <option name="VM_PARAMETERS" value="-XX:+AllowEnhancedClassRedefinition -XX:HotswapAgent=fatjar" />
+    <option name="WORKING_DIRECTORY" value="C:\No Man's Land\" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+    <option name="ALTERNATIVE_JRE_PATH" value="$PROJECT_DIR$/../../../Program Files/jbr-25.0.3-windows-x64-b480.61" />
+    <method v="2" />
+  </configuration>
+</component>

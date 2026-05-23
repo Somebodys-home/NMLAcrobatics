@@ -28,11 +28,9 @@ import java.util.HashMap;
 import java.util.UUID;
 
 public class AcrobaticsListener implements Listener {
-    private final NMLAcrobatics nmlAcrobatics;
-    private final SkillSetManager skillSetManager;
-    private final ProfileManager profileManager;
-    private static final HashMap<UUID, Long> lastSneakToggle = new HashMap<>();
-    private static final long inputThreshold = 300;
+    private NMLAcrobatics nmlAcrobatics;
+    private SkillSetManager skillSetManager;
+    private ProfileManager profileManager;
 
     public AcrobaticsListener(NMLAcrobatics nmlAcrobatics) {
         this.nmlAcrobatics = nmlAcrobatics;
@@ -123,10 +121,19 @@ public class AcrobaticsListener implements Listener {
         if (!event.isSneaking()) return;
 
         Player player = event.getPlayer();
-        long now = System.currentTimeMillis();
-        long lastTime = lastSneakToggle.getOrDefault(player.getUniqueId(), 0L);
 
-        if (now - lastTime <= inputThreshold && (!player.hasMetadata("roll cooldown") && !player.hasMetadata("roll brace"))) {
+        if (!player.hasMetadata("sneak_start")) { // if this is their first sneak, then set the flag and the timer
+            player.setMetadata("sneak_start",  new FixedMetadataValue(nmlAcrobatics, true));
+
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    player.removeMetadata("sneak_start", nmlAcrobatics);
+                }
+            }.runTaskLater(nmlAcrobatics, 10);
+        } else if (!player.hasMetadata("roll cooldown")) { // if this isn't and the player isnt on cooldown then remove the flag and roll
+            player.removeMetadata("sneak_start", nmlAcrobatics);
+
             if (player.isOnGround()) {
                 Maneuvers.roll(player);
             }
@@ -135,8 +142,6 @@ public class AcrobaticsListener implements Listener {
                 player.playSound(player, Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1f);
             }
         }
-
-        lastSneakToggle.put(player.getUniqueId(), now);
     }
 
     @EventHandler
@@ -144,14 +149,13 @@ public class AcrobaticsListener implements Listener {
         Player player = event.getPlayer();
 
         if (!player.hasMetadata("roll brace")) return;
-
         if (player.isOnGround()) {
             new BukkitRunnable() {
                 @Override
                 public void run() {
                     player.removeMetadata("roll brace", nmlAcrobatics);
                 }
-            }.runTaskLater(nmlAcrobatics, 1);
+            }.runTaskLater(nmlAcrobatics, 1); // delay for a tick to give time for vv this listener vv to run
         }
     }
 
@@ -166,32 +170,14 @@ public class AcrobaticsListener implements Listener {
     }
 
     @EventHandler
-    public void startLongJumpMetadata(PlayerToggleSneakEvent event) {
+    public void longJump(PlayerJumpEvent event) {
         Player player = event.getPlayer();
         int acrobaticsLvl = skillSetManager.getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
 
-        if (!event.isSneaking()) return;
-        if (player.isSprinting() && acrobaticsLvl >= 10) {
-            player.setMetadata("start long jump", new FixedMetadataValue(nmlAcrobatics, true));
-
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    player.removeMetadata("start long jump", nmlAcrobatics);
-                }
-            }.runTaskLater(nmlAcrobatics, 5L);
-        }
-    }
-
-    @EventHandler
-    public void actualLongJump(PlayerJumpEvent event) {
-        Player player = event.getPlayer();
-
-        if (player.hasMetadata("start long jump")) {
-            player.removeMetadata("start long jump", nmlAcrobatics);
+        if (player.hasMetadata("sneak_start") && player.isSprinting() && acrobaticsLvl >= 10) {
+            player.removeMetadata("sneak_start", nmlAcrobatics);
             Maneuvers.longJump(player);
         }
-
     }
 
     @EventHandler
@@ -235,13 +221,13 @@ public class AcrobaticsListener implements Listener {
 
     @EventHandler
     public void onPerformManeuver(PerformedManeuverEvent event) {
-        Player player = event.getPlayer();
-        ManeuverCombos maneuverCombos = nmlAcrobatics.getManeuverCombos();
-
-        if (!maneuverCombos.alreadyStartedCombo(player)) {
-            maneuverCombos.startCombo(player, event.getManeuver());
-        } else {
-            maneuverCombos.addToCombo(player, event.getManeuver());
-        }
+//        Player player = event.getPlayer();
+//        ManeuverCombos maneuverCombos = nmlAcrobatics.getManeuverCombos();
+//
+//        if (!maneuverCombos.alreadyStartedCombo(player)) {
+//            maneuverCombos.startCombo(player, event.getManeuver());
+//        } else {
+//            maneuverCombos.addToCombo(player, event.getManeuver());
+//        }
     }
 }

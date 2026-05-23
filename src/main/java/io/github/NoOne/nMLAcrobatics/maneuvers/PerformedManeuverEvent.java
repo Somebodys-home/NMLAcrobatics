@@ -6,9 +6,9 @@ import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
 public class PerformedManeuverEvent extends Event {
-    private static final HandlerList handlers = new HandlerList();
-    private final Player player;
-    private final String maneuver;
+    private static HandlerList handlers = new HandlerList();
+    private Player player;
+    private String maneuver;
 
     public PerformedManeuverEvent(@NotNull Player player, String maneuver) {
         this.player = player;

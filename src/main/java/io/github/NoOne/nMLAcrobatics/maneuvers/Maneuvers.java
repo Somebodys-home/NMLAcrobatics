@@ -17,29 +17,44 @@ import java.util.*;
 
 public class Maneuvers {
     private static NMLAcrobatics nmlAcrobatics;
+    private BukkitTask speedometer;
     private BukkitTask railGrindTask;
-    private BukkitTask locationTracker;
     private BukkitTask wallRunTask;
-    private static final HashMap<UUID, Location> previousLocations = new HashMap<>();
-    private static final HashMap<UUID, Double> railGrindSpeed = new HashMap<>();
-    private static final HashMap<UUID, Integer> railGrindSoundTicks = new HashMap<>();
-    private static final HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
-    private static final HashMap<UUID, Location> lastDirectionChangeLocation = new HashMap<>();
-    private static final HashMap<UUID, Location> railGrindParticleLocation = new HashMap<>();
-    private static final HashMap<UUID, Vector> wallCardinals = new HashMap<>(); // only to know where to push the player back to when on a wall
-    private static final HashMap<UUID, Double> wallRunSpeeds = new HashMap<>(); // speed that you start wall running at
-    private static final HashMap<UUID, Integer> wallRunTimes = new HashMap<>(); // the amount of time that you spend wall running
+    private static HashMap<UUID, Double> playerSpeeds = new HashMap<>();
+    private static HashMap<UUID, Vector> rollDirections = new HashMap<>();
+    private static HashMap<UUID, Location> previousLocations = new HashMap<>();
+    private static HashMap<UUID, Integer> railGrindSoundTicks = new HashMap<>();
+    private static HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
+    private static HashMap<UUID, Location> lastDirectionChangeLocation = new HashMap<>();
+    private static HashMap<UUID, Location> railGrindParticleLocation = new HashMap<>();
+    private static HashMap<UUID, Vector> wallCardinals = new HashMap<>(); // only to know where to push the player back to when on a wall
+    private static HashMap<UUID, Double> wallRunSpeeds = new HashMap<>(); // speed that you start wall running at
+    private static HashMap<UUID, Integer> wallRunTimes = new HashMap<>(); // the amount of time that you spend wall running
 
     public Maneuvers(NMLAcrobatics nmlAcrobatics) {
         Maneuvers.nmlAcrobatics = nmlAcrobatics;
     }
 
-    public void startLocationTracker() {
-        locationTracker = new BukkitRunnable() {
+    public void startSpeedometer() {
+        speedometer = new BukkitRunnable() {
             @Override
             public void run() {
                 for (Player player : Bukkit.getOnlinePlayers()) {
-                    previousLocations.put(player.getUniqueId(), player.getLocation());
+                    UUID uuid = player.getUniqueId();
+                    Location location = player.getLocation();
+                    Location previousLocation = previousLocations.get(uuid);
+
+                    if (previousLocation != null) {
+                        Vector delta = location.toVector().subtract(previousLocation.toVector());
+
+                        if (delta.lengthSquared() > 0.0001) {
+                            rollDirections.put(uuid, delta.normalize());
+                        }
+
+                        playerSpeeds.put(uuid, previousLocation.distance(location) * 20);
+                    }
+
+                    previousLocations.put(uuid, location);
                 }
             }
         }.runTaskTimer(nmlAcrobatics, 0, 1);
@@ -53,18 +68,8 @@ public class Maneuvers {
             public void run() {
                 soundTicks++;
 
-                /// sound
+                // sound
                 ArrayList<UUID> soundUUIDs = new ArrayList<>();
-
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    if (player.hasMetadata("rail grind")) {
-                        soundUUIDs.add(player.getUniqueId());
-                    }
-                }
-
-                if (soundUUIDs.isEmpty()) {
-                    soundTicks = 31;
-                }
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (player.hasMetadata("rail grind")) {
@@ -72,10 +77,11 @@ public class Maneuvers {
                         Stats stats = nmlAcrobatics.getProfileManager().getPlayerProfile(uuid).getStats();
                         Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
 
+                        soundUUIDs.add(player.getUniqueId());
+
                         if (isGrindable(below)) {
                             int soundTicks = railGrindSoundTicks.getOrDefault(uuid, 0) + 1;
                             String priorDirection = lastSuccessfulRailGrindDirection.get(uuid);
-                            double speed = railGrindSpeed.get(uuid);
                             boolean ableToSwitchDirection = true;
                             String newDirection = null;
                             Vector velocity = null;
@@ -128,7 +134,7 @@ public class Maneuvers {
                             }
 
                             // apply velocity, multiplied by speed, to player
-                            if (velocity != null) player.setVelocity(velocity.multiply(speed));
+                            if (velocity != null) player.setVelocity(velocity.multiply(playerSpeeds.get(uuid) / 10));
 
                             // sound
                             if (soundTicks == 30) {
@@ -157,6 +163,10 @@ public class Maneuvers {
                             stopRailGrinding(player);
                         }
                     }
+                }
+
+                if (soundUUIDs.isEmpty()) {
+                    soundTicks = 31;
                 }
             }
         }.runTaskTimer(nmlAcrobatics, 0, 1);
@@ -233,29 +243,19 @@ public class Maneuvers {
 
     public void stopTasks() {
         railGrindTask.cancel();
-        locationTracker.cancel();
+        speedometer.cancel();
         wallRunTask.cancel();
     }
 
     public static void roll(Player player) {
-        UUID id = player.getUniqueId();
-        Location last = previousLocations.get(id);
-        Location currentLocation = player.getLocation();
+        UUID uuid = player.getUniqueId();
+        Location previousLocation = previousLocations.get(uuid);
 
-        if (last == null) return;
-
-        Vector movement = currentLocation.toVector().subtract(last.toVector());
-
-        if (movement.lengthSquared() > 0.01) {
+        if (previousLocation != null && playerSpeeds.get(uuid) > 0.5) { // if youre actually moving
             double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
-            Vector roll = movement.normalize().multiply(2).multiply(speedMultiplier);
+            Vector roll = rollDirections.get(uuid).multiply(2).multiply(speedMultiplier);
 
-            player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-            EnergyManager.useEnergy(player, 10);
-            CooldownManager.putOnHardCooldown(player, 1.5);
             player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
-            player.setVelocity(roll);
-            Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Roll"));
 
             new BukkitRunnable() {
                 @Override
@@ -263,6 +263,12 @@ public class Maneuvers {
                     player.removeMetadata("roll cooldown", nmlAcrobatics);
                 }
             }.runTaskLater(nmlAcrobatics, 30);
+
+            player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+            EnergyManager.useEnergy(player, 10);
+            CooldownManager.putOnHardCooldown(player, 1.5);
+            player.setVelocity(roll);
+            Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Roll"));
         }
     }
 
@@ -287,7 +293,6 @@ public class Maneuvers {
     public static void longJump(Player player) {
         double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
         Vector longJump = player.getLocation().getDirection().normalize().multiply(.9).multiply(speedMultiplier).setY(.5);
-        double speed = longJump.length();
 
         player.setVelocity(longJump);
         EnergyManager.useEnergy(player, 15);
@@ -295,12 +300,12 @@ public class Maneuvers {
         player.stopSound(Sound.ENTITY_MINECART_RIDING);
         player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
         Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Long Jump"));
-        postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 0, 1);
+        postJumpRunnable(player).runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
-    public static void railGrind(Player player, double speed) {
+    public static void railGrind(Player player) {
+        player.sendMessage("speed: " + playerSpeeds.get(player.getUniqueId()));
         player.setMetadata("rail grind", new FixedMetadataValue(nmlAcrobatics, true));
-        railGrindSpeed.put(player.getUniqueId(), speed);
         player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
 
         float yaw = player.getLocation().getYaw();
@@ -338,7 +343,6 @@ public class Maneuvers {
         player.stopSound(Sound.ENTITY_MINECART_RIDING);
         lastSuccessfulRailGrindDirection.remove(uuid);
         lastDirectionChangeLocation.remove(uuid);
-        railGrindSpeed.remove(uuid);
         maneuverCombos.startComboDepleteTask(player);
         EnergyManager.resumeEnergyRegen(player);
     }
@@ -353,7 +357,7 @@ public class Maneuvers {
         player.stopSound(Sound.ENTITY_MINECART_RIDING);
         player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
         player.removeMetadata("rail grind", nmlAcrobatics);
-        postJumpRunnable(player, speed).runTaskTimer(nmlAcrobatics, 5, 1);
+        postJumpRunnable(player).runTaskTimer(nmlAcrobatics, 5, 1);
         Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Jump"));
     }
 
@@ -439,7 +443,7 @@ public class Maneuvers {
                     if (nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel() >= 20 &&
                             isGrindable(player.getLocation().getBlock().getRelative(BlockFace.DOWN))) {
 
-                        railGrind(player, speed);
+                        railGrind(player);
                         player.removeMetadata("long jump", nmlAcrobatics);
                         canceled = true;
                         cancel();
@@ -494,10 +498,6 @@ public class Maneuvers {
         }.runTaskTimer(nmlAcrobatics, 10, 1);
     }
 
-    public static double getSpeed(Player player) { // used in NMLAbilities
-        return previousLocations.get(player.getUniqueId()).distance(player.getLocation()) * 20;
-    }
-
     private static void centerPlayer(Player player) {
         Location loc = player.getLocation();
         float yaw = player.getLocation().getYaw();
@@ -512,7 +512,7 @@ public class Maneuvers {
         player.teleport(loc.add(0, .5, 0));
     }
 
-    private static BukkitRunnable postJumpRunnable(Player player, double speed) {
+    private static BukkitRunnable postJumpRunnable(Player player) {
         return new BukkitRunnable() {
             @Override
             public void run() {
@@ -520,7 +520,7 @@ public class Maneuvers {
                     if (nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel() >= 20 &&
                             isGrindable(player.getLocation().getBlock().getRelative(BlockFace.DOWN))) {
 
-                        railGrind(player, speed);
+                        railGrind(player);
                         player.removeMetadata("long jump", nmlAcrobatics);
                     }
 
@@ -690,5 +690,9 @@ public class Maneuvers {
                 block.getType() == Material.CRIMSON_FENCE || block.getType() == Material.CRIMSON_FENCE_GATE ||
                 block.getType() == Material.WARPED_FENCE || block.getType() == Material.WARPED_FENCE_GATE ||
                 block.getType() == Material.NETHER_BRICK_FENCE || block.getType() == Material.IRON_BARS;
+    }
+
+    public static double getSpeed(Player player) { // used in NMLAbilities
+        return playerSpeeds.get(player.getUniqueId());
     }
 }

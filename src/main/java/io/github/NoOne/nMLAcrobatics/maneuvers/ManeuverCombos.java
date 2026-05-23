@@ -22,7 +22,7 @@ public class ManeuverCombos {
     private NMLAcrobatics nmlAcrobatics;
     private HashMap<UUID, ArrayList<String>> maneuverCombos;
     private HashMap<UUID, BossBar> comboBars;
-    private final HashMap<UUID, BukkitTask> ongoingDepletingComboTasks = new HashMap<>();
+    private HashMap<UUID, BukkitTask> ongoingDepletingComboTasks = new HashMap<>();
 
     public ManeuverCombos(NMLAcrobatics nmlAcrobatics) {
         this.nmlAcrobatics = nmlAcrobatics;

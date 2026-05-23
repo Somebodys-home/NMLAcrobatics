@@ -10,7 +10,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class NMLAcrobatics extends JavaPlugin {
+public class NMLAcrobatics extends JavaPlugin {
     private ProfileManager profileManager;
     private SkillSetManager skillSetManager;
     private Maneuvers maneuvers;
@@ -22,7 +22,7 @@ public final class NMLAcrobatics extends JavaPlugin {
         skillSetManager = JavaPlugin.getPlugin(NMLSkills.class).getSkillSetManager();
 
         maneuvers = new Maneuvers(this);
-        maneuvers.startLocationTracker();
+        maneuvers.startSpeedometer();
         maneuvers.startRailGrindTask();
         maneuvers.startWallRunTask();
 
@@ -38,7 +38,7 @@ public final class NMLAcrobatics extends JavaPlugin {
         }
 
         maneuvers.stopTasks();
-        maneuverCombos.stop();
+//        maneuverCombos.stop();
     }
 
     public SkillSetManager getSkillSetManager() {
