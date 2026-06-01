@@ -251,9 +251,8 @@ public class Maneuvers {
         UUID uuid = player.getUniqueId();
         Location previousLocation = previousLocations.get(uuid);
 
-        if (previousLocation != null && playerSpeeds.get(uuid) > 0.5) { // if youre actually moving
-            double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
-            Vector roll = rollDirections.get(uuid).multiply(2).multiply(speedMultiplier);
+        if (previousLocation != null && playerSpeeds.get(uuid) > 0.5) { // if you're actually moving
+            Vector roll = rollDirections.get(uuid).multiply(2);
 
             player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));
 
@@ -273,8 +272,7 @@ public class Maneuvers {
     }
 
     public static void rollBrace(Player player) {
-        double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
-        Vector roll = player.getLocation().getDirection().normalize().multiply(3).multiply(speedMultiplier);
+        Vector roll = player.getLocation().getDirection().normalize().multiply(3);
 
         player.setVelocity(roll);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
@@ -415,7 +413,6 @@ public class Maneuvers {
     public static void wallJump(Player player) {
         double speed = wallRunSpeeds.get(player.getUniqueId());
         Vector reverseWallCardinal = reverseWallCardinal(wallCardinals.get(player.getUniqueId()));
-        double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
         Vector wallJump;
 
         // vector changes depending on if the player is looking at the wall before jumping
@@ -425,7 +422,6 @@ public class Maneuvers {
             wallJump = new Vector(0, .5, 0);
         }
 
-        wallJump.multiply(speedMultiplier);
         stopWallRunning(player);
         player.setVelocity(wallJump);
         EnergyManager.resumeEnergyRegen(player);

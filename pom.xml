@@ -91,7 +91,7 @@
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLEnergySystem</artifactId>
-            <version>25b6a71306</version>
+            <version>78f2dc721b</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
