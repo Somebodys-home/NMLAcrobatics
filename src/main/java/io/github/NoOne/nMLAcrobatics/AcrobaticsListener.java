@@ -111,7 +111,7 @@ public class AcrobaticsListener implements Listener {
                     .build());
             fireworkMeta.setPower(0);
             firework.setFireworkMeta(fireworkMeta);
-            firework.setMetadata("ability_firework", new FixedMetadataValue(nmlAcrobatics, true));
+            firework.setMetadata("no_damage", new FixedMetadataValue(nmlAcrobatics, true));
             firework.detonate();
         }
     }
