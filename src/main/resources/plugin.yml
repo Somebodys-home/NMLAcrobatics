@@ -1,7 +1,9 @@
 name: NMLAcrobatics
-version: '1.0'
+version: '${version}'
+
 main: io.github.NoOne.nMLAcrobatics.NMLAcrobatics
-api-version: '1.21'
+api-version: '26.3'
+load: POSTWORLD
 depend:
   - NMLSkills
   - NMLAbilities
