@@ -2,7 +2,7 @@ package io.github.NoOne.nMLAcrobatics.maneuvers;
 
 import io.github.NoOne.nMLAbilities.abilitySystem.cooldownSystem.CooldownManager;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
-import io.github.NoOne.nMLEnergySystem.EnergyManager;
+import io.github.NoOne.nMLEnergy.EnergyManager;
 import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
 import org.bukkit.*;
 import org.bukkit.block.Block;

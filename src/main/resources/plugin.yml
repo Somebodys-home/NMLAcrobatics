@@ -7,5 +7,5 @@ load: POSTWORLD
 depend:
   - NMLSkills
   - NMLAbilities
-  - NMLEnergySystem
+  - NMLEnergy
   - NMLPlayerStats

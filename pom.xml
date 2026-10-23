@@ -90,8 +90,8 @@
         </dependency>
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
-            <artifactId>NMLEnergySystem</artifactId>
-            <version>78f2dc721b</version>
+            <artifactId>NMLEnergy</artifactId>
+            <version>c25b309325</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
