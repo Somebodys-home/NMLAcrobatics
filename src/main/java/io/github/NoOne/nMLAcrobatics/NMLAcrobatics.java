@@ -38,7 +38,7 @@ public class NMLAcrobatics extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new AcrobaticsListener(this), this);
         getServer().getPluginManager().registerEvents(new RollListener(this), this);
         getServer().getPluginManager().registerEvents(new LongJumpListener(this), this);
-        getServer().getPluginManager().registerEvents(new RailGrindListener(this), this);
+        getServer().getPluginManager().registerEvents(new RailGrindListener(), this);
     }
 
     @Override

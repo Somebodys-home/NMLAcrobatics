@@ -1,6 +1,7 @@
 package io.github.NoOne.nMLAcrobatics.maneuvers.railGrind;
 
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
+import io.github.NoOne.nMLAcrobatics.Speedometer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -17,35 +18,37 @@ import java.util.UUID;
 
 public class RailGrind {
     private static NMLAcrobatics nmlAcrobatics = NMLAcrobatics.getInstance();
-    private static HashMap<UUID, Vector> railGrindDirections = new HashMap<>();
+    private static HashMap<UUID, Vector> railGrindDirections = new HashMap<>(); // the direction that the player is grinding in
+    private static HashMap<UUID, Double> railGrindSpeeds = new HashMap<>(); // the speed that the the player is grinding at
     private static HashMap<UUID, Float> playerWalkSpeeds = new HashMap<>(); // set the players movement speed to 0 when rail grinding, so make sure to save the value it was before
 
     public static void startRailGrindTask() {
         new BukkitRunnable() {
             @Override
             public void run() {
-                // todo: make some logic for falling off the rail so that you can continue rail grinding when you fall off unti you hit the ground
-                //  also work on rail jumping
-                //  and add back sound
+                // todo: work on rail jumping and add back sound
+                //  and add check if the player hits a wall (probably after you make wall running
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
-                    Block bottomBlock = getBottomBlock(player);
-
                     if (!player.hasMetadata("rail grind")) return;
-                    if (!isGrindable(bottomBlock)) { // player has fallen off the rail :T
+                    if (!isGrindable(getBottomBlock(player))) { // player has fallen off the rail :T
                         stopRailGrind(player);
+                        fellOffRailTask(player);
                         continue;
                     }
 
-                    // setting the player's velocity
                     Vector direction = railGrindDirections.get(player.getUniqueId());
                     BlockFace cardinal = convertVectorToCardinal(direction);
 
-                    player.setVelocity(direction.clone());
+                    Block bottomBlock = getBottomBlock(player);
+                    Block forwardsBottomBlock = bottomBlock.getRelative(cardinal);
+                    Block forwardsBottomBottomBlock = forwardsBottomBlock.getRelative(BlockFace.DOWN);
+                    Block forwardsTopBlock = forwardsBottomBlock.getRelative(BlockFace.UP);
+
+                    // setting the player's velocity
+                    player.setVelocity(getRailGrindVelocity(player));
 
                     // turning logic
-                    boolean hasTurned = false; // have to hold this variable cuz scaling downwards logic semi clashes with turning logic
-
                     if (isAboutToFall(player, cardinal)) {
                         BlockFace priorityCardinal = null;
 
@@ -61,50 +64,35 @@ public class RailGrind {
                             // the block that the player would be going on in the direction they're looking is grindable
                             // crank that shit sojaboy
                             if (isTurningDirectionValid(player, priorityCardinal)) {
-                                centerPlayerOnBlock(player);
-                                railGrindDirections.put(player.getUniqueId(), getCardinalDirection(priorityCardinal));
-                                hasTurned = true;
+                                turnPlayer(player, priorityCardinal);
                             } else { // if not, repeat that same check to the opposite cardinal block
                                 BlockFace oppositeCardinal = getOppositeCardinal(priorityCardinal);
 
                                 if (isTurningDirectionValid(player, oppositeCardinal)) {
-                                    centerPlayerOnBlock(player);
-                                    railGrindDirections.put(player.getUniqueId(), getCardinalDirection(oppositeCardinal));
-                                    hasTurned = true;
+                                    turnPlayer(player, oppositeCardinal);
                                 }
                             }
-                        } else { // if the player isn't looking in a valid direction, just check from left to right
+                        } else { // if the player isn't looking in a valid direction, just check from right to left
                             BlockFace leftCardinal = getLeftCardinal(cardinal);
                             BlockFace rightCardinal = getRightCardinal(cardinal);
 
-                            if (isTurningDirectionValid(player, leftCardinal)) {
-                                centerPlayerOnBlock(player);
-                                railGrindDirections.put(player.getUniqueId(), getCardinalDirection(leftCardinal));
-                                hasTurned = true;
-                            } else if (isTurningDirectionValid(player, rightCardinal)) {
-                                centerPlayerOnBlock(player);
-                                railGrindDirections.put(player.getUniqueId(), getCardinalDirection(rightCardinal));
-                                hasTurned = true;
+                            if (isTurningDirectionValid(player, rightCardinal)) {
+                                turnPlayer(player, rightCardinal);
+                            } else if (isTurningDirectionValid(player, leftCardinal)) {
+                                turnPlayer(player, leftCardinal);
                             }
                         }
                     }
 
                     // scaling logic
-                    Block frontTopBlock = player.getLocation().getBlock().getRelative(cardinal);
-                    Block frontBottomBlock = bottomBlock.getRelative(cardinal).getRelative(BlockFace.DOWN);
-
-                    if (frontTopBlock.isSolid()) {
-                        if (isGrindable(frontTopBlock)) { // if you hit a block at your feet that is grindable, then go on top of it
-                            centerPlayerOnBlock(player, frontTopBlock);
-                            player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
-                        } else { // if it isnt grindable, then you stop there
+                    if (forwardsTopBlock.isSolid()) {
+                        if (isGrindable(forwardsTopBlock)) { // if you hit a block at your feet that is grindable, then go on top of it
+                            centerPlayerOnBlock(player, forwardsTopBlock);
+                        } else { // if it isn't grindable, then you stop there
                             stopRailGrind(player);
                         }
-                    } else if (!hasTurned && isAboutToFall(player, cardinal) && frontBottomBlock.isSolid()) {
-                        if (isGrindable(frontBottomBlock)) { // if youre gonna fall on a grindable block, go on top of it
-                            centerPlayerOnBlock(player, frontBottomBlock);
-                            player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
-                        }
+                    } else if (!isGrindable(forwardsBottomBlock) && isGrindable(forwardsBottomBottomBlock)) { // if youre gonna fall on a grindable block, go on top of it
+                        centerPlayerOnBlock(player, forwardsBottomBottomBlock);
                     }
                 }
             }
@@ -112,18 +100,42 @@ public class RailGrind {
     }
 
     public static void startRailGrind(Player player) {
+        UUID uuid = player.getUniqueId();
+
         player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
         player.setMetadata("rail grind", new FixedMetadataValue(nmlAcrobatics, true));
 
         centerPlayerOnBlock(player);
-        railGrindDirections.put(player.getUniqueId(), getCardinalDirection(player));
-        playerWalkSpeeds.put(player.getUniqueId(), player.getWalkSpeed());
+        railGrindDirections.put(uuid, getCardinalDirection(player));
+        playerWalkSpeeds.put(uuid, player.getWalkSpeed());
+        railGrindSpeeds.put(uuid, Speedometer.getSpeed(player));
         player.setWalkSpeed(0);
     }
 
     public static void stopRailGrind(Player player) {
         player.removeMetadata("rail grind", nmlAcrobatics);
         player.setWalkSpeed(playerWalkSpeeds.get(player.getUniqueId()));
+    }
+
+    // when the player falls off a rail, they can continue a rail grind if they land on a rail
+    private static void fellOffRailTask(Player player) {
+        player.setVelocity(getRailGrindVelocity(player));
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                Block belowBlock = getBottomBlock(player);
+
+                if (isGrindable(belowBlock)) {
+                    startRailGrind(player);
+                    cancel();
+                }
+
+                if (player.isOnGround()) {
+                    cancel();
+                }
+            }
+        }.runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
     private static void centerPlayerOnBlock(Player player) {
@@ -143,6 +155,11 @@ public class RailGrind {
         location.setZ(location.getBlockZ() + .5);
         location.setRotation(player.getYaw(), player.getPitch());
         player.teleport(location);
+    }
+
+    private static void turnPlayer(Player player, BlockFace newDirection) {
+        centerPlayerOnBlock(player);
+        railGrindDirections.put(player.getUniqueId(), getCardinalDirection(newDirection));
     }
 
     public static boolean isGrindable(Block block) {
@@ -178,6 +195,12 @@ public class RailGrind {
 
     private static Vector getCardinalDirection(BlockFace blockFace) {
         return blockFace.getDirection();
+    }
+
+    private static Vector getRailGrindVelocity(Player player) {
+        double speedMultiplier = Math.min(1, (railGrindSpeeds.get(player.getUniqueId()) / 20) * 1.35);
+
+        return railGrindDirections.get(player.getUniqueId()).clone().multiply(speedMultiplier);
     }
 
     private static BlockFace convertVectorToCardinal(Vector vector) {
