@@ -3,7 +3,6 @@ package io.github.NoOne.nMLAcrobatics.maneuvers;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import io.github.NoOne.nMLAcrobatics.Speedometer;
 import io.github.NoOne.nMLEnergy.EnergyManager;
-import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -17,7 +16,6 @@ import java.util.*;
 
 public class Maneuvers {
     private static NMLAcrobatics nmlAcrobatics;
-    private BukkitTask railGrindTask;
     private BukkitTask wallRunTask;
     private static HashMap<UUID, Integer> railGrindSoundTicks = new HashMap<>();
     private static HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
@@ -29,118 +27,6 @@ public class Maneuvers {
 
     public Maneuvers(NMLAcrobatics nmlAcrobatics) {
         Maneuvers.nmlAcrobatics = nmlAcrobatics;
-    }
-
-    public void startRailGrindTask() {
-        railGrindTask = new BukkitRunnable() {
-            int soundTicks = 0;
-
-            @Override
-            public void run() {
-                soundTicks++;
-
-                // sound
-                ArrayList<UUID> soundUUIDs = new ArrayList<>();
-
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    if (player.hasMetadata("rail grind")) {
-                        UUID uuid = player.getUniqueId();
-                        Stats stats = nmlAcrobatics.getProfileManager().getPlayerProfile(uuid).getStats();
-                        Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
-
-                        soundUUIDs.add(player.getUniqueId());
-
-                        if (isGrindable(below)) {
-                            int soundTicks = railGrindSoundTicks.getOrDefault(uuid, 0) + 1;
-                            String priorDirection = lastSuccessfulRailGrindDirection.get(uuid);
-                            boolean ableToSwitchDirection = true;
-                            String newDirection = null;
-                            Vector velocity = null;
-                            double speedMultiplier = stats.getSpeed() / 100.0;
-                            Location railJumpLandingPosition = calculateRailJumpLandingPosition(player, speedMultiplier);
-                            Particle.DustOptions particleDust;
-
-                            if (speedMultiplier < 1) {
-                                particleDust = new Particle.DustOptions(Color.RED, 1.0F);
-                            } else if (speedMultiplier < 1.3) {
-                                particleDust = new Particle.DustOptions(Color.FUCHSIA, 1.0F);
-                            } else {
-                                particleDust = new Particle.DustOptions(Color.AQUA, 1.0F);
-                            }
-
-                            Block base = player.getLocation().getBlock();
-                            Block northBlock = base.getRelative(BlockFace.NORTH).getRelative(BlockFace.DOWN);
-                            Block eastBlock  = base.getRelative(BlockFace.EAST).getRelative(BlockFace.DOWN);
-                            Block southBlock = base.getRelative(BlockFace.SOUTH).getRelative(BlockFace.DOWN);
-                            Block westBlock  = base.getRelative(BlockFace.WEST).getRelative(BlockFace.DOWN);
-
-                            // boolean for if the player is more than 1 block away from the block where they last switched directions
-                            if (lastDirectionChangeLocation.get(uuid) != null && lastDirectionChangeLocation.get(uuid).distance(player.getLocation().getBlock().getLocation()) < 1) {
-                                ableToSwitchDirection = false;
-                            }
-
-                            // what direction to grind in / changing directions
-                            if (isGrindable(northBlock) && !"south".equals(priorDirection) && ableToSwitchDirection) {
-                                newDirection = "north";
-                                velocity = new Vector(0, 0, -0.5);
-                            }
-                            else if (isGrindable(eastBlock) && !"west".equals(priorDirection) && ableToSwitchDirection) {
-                                newDirection = "east";
-                                velocity = new Vector(0.5, 0, 0);
-                            }
-                            else if (isGrindable(southBlock) && !"north".equals(priorDirection) && ableToSwitchDirection) {
-                                newDirection = "south";
-                                velocity = new Vector(0, 0, 0.5);
-                            }
-                            else if (isGrindable(westBlock) && !"east".equals(priorDirection) && ableToSwitchDirection) {
-                                newDirection = "west";
-                                velocity = new Vector(-0.5, 0, 0);
-                            }
-
-                            // if we've changed directions, save it
-                            if (newDirection != null && !newDirection.equals(priorDirection)) {
-                                centerPlayer(player); // center the player
-                                lastSuccessfulRailGrindDirection.put(uuid, newDirection); // save the direction we're now going in
-                                lastDirectionChangeLocation.put(uuid, player.getLocation().getBlock().getLocation()); // save the location of the block that we changed direction from
-                            }
-
-                            // apply velocity, multiplied by speed, to player
-                            if (velocity != null) player.setVelocity(velocity.multiply(Speedometer.getSpeed(player) / 10));
-
-                            // sound
-                            if (soundTicks == 30) {
-                                player.playSound(player, Sound.ENTITY_MINECART_RIDING, 1f, 1f);
-                                soundTicks = 0;
-                            }
-
-                            // particle helper
-                            if (!railJumpLandingPosition.getBlock().getType().isAir()) {
-                                List<Location> particleWireFrame = createHollowCube(
-                                        railJumpLandingPosition.clone().add(.5, .5, .5),
-                                        railJumpLandingPosition.clone().add(-.5, -.5, -.5),
-                                        .25
-                                );
-
-                                for (Location location : particleWireFrame) {
-                                    player.getWorld().spawnParticle(Particle.DUST, location, 1, 0, 0, 0, particleDust);
-                                }
-                            } else {
-                                player.getWorld().spawnParticle(Particle.DUST, railJumpLandingPosition, 1, 0, 0, 0, particleDust);
-                            }
-
-                            railGrindParticleLocation.put(uuid, railJumpLandingPosition);
-                            railGrindSoundTicks.put(uuid, soundTicks);
-                        } else {
-                            stopRailGrinding(player);
-                        }
-                    }
-                }
-
-                if (soundUUIDs.isEmpty()) {
-                    soundTicks = 31;
-                }
-            }
-        }.runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
     public void startWallRunTask() {
@@ -213,7 +99,6 @@ public class Maneuvers {
     }
 
     public void stopTasks() {
-        railGrindTask.cancel();
         wallRunTask.cancel();
     }
 
