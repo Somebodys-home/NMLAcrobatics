@@ -6,7 +6,6 @@ import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrind;
 import io.github.NoOne.nMLEnergy.EnergyManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -35,9 +34,7 @@ public class LongJump {
             @Override
             public void run() {
                 if (player.isOnGround()) { // rail grind logic
-                    Block belowBlock = RailGrind.getBottomBlock(player);
-
-                    if (acrobaticsLevel >= 20 && RailGrind.isGrindable(belowBlock)) {
+                    if (acrobaticsLevel >= 20 && RailGrind.isGrindable(RailGrind.getBottomBlock(player))) {
                         RailGrind.startRailGrind(player);
                         player.removeMetadata("long jump", nmlAcrobatics);
                     }

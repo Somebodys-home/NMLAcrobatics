@@ -34,6 +34,7 @@ public class RailGrind {
                     if (!isGrindable(getBottomBlock(player))) { // player has fallen off the rail :T
                         stopRailGrind(player);
                         fellOffRailTask(player);
+
                         continue;
                     }
 
@@ -124,18 +125,15 @@ public class RailGrind {
         new BukkitRunnable() {
             @Override
             public void run() {
-                Block belowBlock = getBottomBlock(player);
-
-                if (isGrindable(belowBlock)) {
-                    startRailGrind(player);
-                    cancel();
-                }
-
                 if (player.isOnGround()) {
+                    if (isGrindable(getBottomBlock(player))) {
+                        startRailGrind(player);
+                    }
+
                     cancel();
                 }
             }
-        }.runTaskTimer(nmlAcrobatics, 0, 1);
+        }.runTaskTimer(nmlAcrobatics, 1, 1);
     }
 
     private static void centerPlayerOnBlock(Player player) {
