@@ -1,31 +1,28 @@
 package io.github.NoOne.nMLAcrobatics;
 
-import com.destroystokyo.paper.event.player.PlayerJumpEvent;
-import io.github.NoOne.nMLAcrobatics.maneuvers.ManeuverCombos;
 import io.github.NoOne.nMLAcrobatics.maneuvers.Maneuvers;
 import io.github.NoOne.nMLAcrobatics.maneuvers.PerformedManeuverEvent;
+import io.github.NoOne.nMLAcrobatics.maneuvers.roll.Roll;
 import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
 import io.github.NoOne.nMLPlayerStats.statSystem.StatChangeEvent;
 import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
 import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
 import io.github.NoOne.nMLSkills.skillSystem.SkillChangeEvent;
 import io.github.NoOne.nMLSkills.skillSystem.Skills;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.Color;
+import org.bukkit.FireworkEffect;
+import org.bukkit.Sound;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerInputEvent;
-import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.HashMap;
-import java.util.UUID;
 
 public class AcrobaticsListener implements Listener {
     private NMLAcrobatics nmlAcrobatics;
@@ -98,7 +95,7 @@ public class AcrobaticsListener implements Listener {
 
             player.sendMessage("§f§l---------------------------");
 
-            /// firework
+            // firework
             Firework firework = (Firework) player.getWorld().spawnEntity(player.getLocation().add(0, 2, 0), EntityType.FIREWORK_ROCKET);
             FireworkMeta fireworkMeta = firework.getFireworkMeta();
 
@@ -116,87 +113,30 @@ public class AcrobaticsListener implements Listener {
         }
     }
 
+    // listener for setting the sneak start for rolls and long jump
     @EventHandler
-    public void roll(PlayerToggleSneakEvent event) {
+    public void sneakStart(PlayerToggleSneakEvent event) {
         if (!event.isSneaking()) return;
 
         Player player = event.getPlayer();
 
-        if (!player.hasMetadata("sneak_start")) { // if this is their first sneak, then set the flag and the timer
-            player.setMetadata("sneak_start",  new FixedMetadataValue(nmlAcrobatics, true));
+        if (!player.hasMetadata("sneak_start")) {
+            player.setMetadata("sneak_start", new FixedMetadataValue(nmlAcrobatics, true));
 
             new BukkitRunnable() {
                 @Override
                 public void run() {
                     player.removeMetadata("sneak_start", nmlAcrobatics);
                 }
-            }.runTaskLater(nmlAcrobatics, 10);
-        } else if (!player.hasMetadata("roll cooldown")) { // if this isn't and the player isnt on cooldown then remove the flag and roll
+            }.runTaskLater(nmlAcrobatics, 5);
+        } else if (!player.hasMetadata("roll cooldown")) { // have to put the logic for rolling here cuz if it was in its own class the listeners would clash
             player.removeMetadata("sneak_start", nmlAcrobatics);
 
             if (player.isOnGround()) {
-                Maneuvers.roll(player);
-            }
-            else { // roll brace
+                Roll.roll(player);
+            } else { // roll brace
                 player.setMetadata("roll brace", new FixedMetadataValue(nmlAcrobatics, true));
                 player.playSound(player, Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1f);
-            }
-        }
-    }
-
-    @EventHandler
-    public void removeRollBraceMetadata(PlayerMoveEvent event) { // remove roll brace metadata when hitting the ground
-        Player player = event.getPlayer();
-
-        if (!player.hasMetadata("roll brace")) return;
-        if (player.isOnGround()) {
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    player.removeMetadata("roll brace", nmlAcrobatics);
-                }
-            }.runTaskLater(nmlAcrobatics, 1); // delay for a tick to give time for vv this listener vv to run
-        }
-    }
-
-    @EventHandler
-    public void actualRollBraceFromDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player player && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
-            if (player.hasMetadata("roll brace")) {
-                event.setDamage(event.getDamage() / 2);
-                Maneuvers.rollBrace(player);
-            }
-        }
-    }
-
-    @EventHandler
-    public void longJump(PlayerJumpEvent event) {
-        Player player = event.getPlayer();
-        int acrobaticsLvl = skillSetManager.getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
-
-        if (player.hasMetadata("sneak_start") && player.isSprinting() && acrobaticsLvl >= 10) {
-            player.removeMetadata("sneak_start", nmlAcrobatics);
-            Maneuvers.longJump(player);
-        }
-    }
-
-    @EventHandler
-    public void getOffGrinding(PlayerInputEvent event) {
-        Player player = event.getPlayer();
-        Input input = event.getInput();
-
-        if (player.hasMetadata("rail grind")) {
-            if (input.isJump() && !player.hasMetadata("no jumping")) {
-                Maneuvers.stopRailGrinding(player);
-
-                new BukkitRunnable() {
-                    @Override
-                    public void run() {
-                        Maneuvers.railJump(player, player.getVelocity().length());
-                    }
-                }.runTaskLater(nmlAcrobatics, 1);
-            } else if (input.isSneak()) {
-                Maneuvers.stopRailGrinding(player);
             }
         }
     }
