@@ -1,10 +1,9 @@
 package io.github.NoOne.nMLAcrobatics.maneuvers.railGrind;
 
+import io.github.NoOne.nMLAbilities.abilitySystem.abilityEffects.AbilityEffectsHelper;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import io.github.NoOne.nMLAcrobatics.Speedometer;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Sound;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
@@ -19,7 +18,7 @@ import java.util.UUID;
 public class RailGrind {
     private static NMLAcrobatics nmlAcrobatics = NMLAcrobatics.getInstance();
     private static HashMap<UUID, Vector> railGrindDirections = new HashMap<>(); // the direction that the player is grinding in
-    private static HashMap<UUID, Double> railGrindSpeeds = new HashMap<>(); // the speed that the the player is grinding at
+    private static HashMap<UUID, Double> railGrindSpeeds = new HashMap<>(); // the speed that the player is grinding at
     private static HashMap<UUID, Float> playerWalkSpeeds = new HashMap<>(); // set the players movement speed to 0 when rail grinding, so make sure to save the value it was before
 
     public static void startRailGrindTask() {
@@ -27,7 +26,7 @@ public class RailGrind {
             @Override
             public void run() {
                 // todo: work on rail jumping and add back sound
-                //  and add check if the player hits a wall (probably after you make wall running
+                //  update the wall check so it prioritizes if you can turn before stopping you
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (!player.hasMetadata("rail grind")) return;
@@ -45,12 +44,14 @@ public class RailGrind {
                     Block forwardsBottomBlock = bottomBlock.getRelative(cardinal);
                     Block forwardsBottomBottomBlock = forwardsBottomBlock.getRelative(BlockFace.DOWN);
                     Block forwardsTopBlock = forwardsBottomBlock.getRelative(BlockFace.UP);
+                    Block eyeBlock = player.getWorld().getBlockAt(forwardsBottomBlock.getLocation().add(0, 2, 0));
+                    boolean aboutToFall = !isGrindable(forwardsBottomBlock) && !isGrindable(forwardsBottomBottomBlock);
 
                     // setting the player's velocity
                     player.setVelocity(getRailGrindVelocity(player));
 
                     // turning logic
-                    if (isAboutToFall(player, cardinal)) {
+                    if (aboutToFall || eyeBlock.isSolid()) {
                         BlockFace priorityCardinal = null;
 
                         if (player.getFacing().equals(getLeftCardinal(cardinal))) {
@@ -94,6 +95,16 @@ public class RailGrind {
                         }
                     } else if (!isGrindable(forwardsBottomBlock) && isGrindable(forwardsBottomBottomBlock)) { // if youre gonna fall on a grindable block, go on top of it
                         centerPlayerOnBlock(player, forwardsBottomBottomBlock);
+                    }
+
+                    // rail jump indicator
+                    World world = player.getWorld();
+                    Location landingLocation = getRailJumpLandingLocation(player);
+
+                    if (isGrindable(world.getBlockAt(landingLocation))) {
+                        AbilityEffectsHelper.makeWireFrameRectangle(landingLocation, .6, 1);
+                    } else {
+                        world.spawnParticle(Particle.DUST, landingLocation, 1, 0, 0, 0, 0, new Particle.DustOptions(Color.FUCHSIA, 1));
                     }
                 }
             }
@@ -172,15 +183,7 @@ public class RailGrind {
         Block frontBottomTopBlock = frontBottomBlock.getRelative(BlockFace.UP);
         Block frontBottomBottomBlock = frontBottomBlock.getRelative(BlockFace.DOWN);
 
-        return isGrindable(frontBottomBlock) ||  isGrindable(frontBottomBottomBlock) || isGrindable(frontBottomTopBlock);
-    }
-
-    public static boolean isAboutToFall(Player player, BlockFace cardinal) {
-        Block bottomBlock = getBottomBlock(player);
-        Block frontBottomBlock = bottomBlock.getRelative(cardinal);
-        Block frontBottomBottomBlock = frontBottomBlock.getRelative(BlockFace.DOWN);
-
-        return !isGrindable(frontBottomBlock) && !isGrindable(frontBottomBottomBlock);
+        return isGrindable(frontBottomBlock) || isGrindable(frontBottomBottomBlock) || isGrindable(frontBottomTopBlock);
     }
 
     public static Block getBottomBlock(Player player) {
@@ -196,9 +199,7 @@ public class RailGrind {
     }
 
     private static Vector getRailGrindVelocity(Player player) {
-        double speedMultiplier = Math.min(1, (railGrindSpeeds.get(player.getUniqueId()) / 20) * 1.35);
-
-        return railGrindDirections.get(player.getUniqueId()).clone().multiply(speedMultiplier);
+        return railGrindDirections.get(player.getUniqueId()).clone().multiply(.7);
     }
 
     private static BlockFace convertVectorToCardinal(Vector vector) {
@@ -244,5 +245,31 @@ public class RailGrind {
             case WEST -> BlockFace.EAST;
             default -> null;
         };
+    }
+
+    private static Location getRailJumpLandingLocation(Player player) {
+        World world = player.getWorld();
+        Location playerLocation = player.getLocation();
+        Vector planarDirection = playerLocation.getDirection().setY(0);
+        Vector horizontal = planarDirection.clone().multiply(9); // todo: add the playrer's railgrinding velocity to this
+
+        if (player.isSprinting()) { // if the player is sprinting, add a flat extra 4 blocks in the direction. doesnt do that rn
+            Location location = playerLocation.clone();
+
+            location.setPitch(0);
+
+            Vector noPitchDirection = location.getDirection().setY(0);
+
+            horizontal.add(noPitchDirection.clone().multiply(3.5));
+        }
+
+        Location finalLocation = playerLocation.clone().add(horizontal);
+        Location finalBlockLocation = playerLocation.clone().add(horizontal).toBlockLocation().add(.5, -.5, .5);
+
+        if (isGrindable(world.getBlockAt(finalBlockLocation))) {
+            return finalBlockLocation;
+        } else {
+            return finalLocation;
+        }
     }
 }

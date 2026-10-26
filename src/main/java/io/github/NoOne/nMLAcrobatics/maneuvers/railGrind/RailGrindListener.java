@@ -1,5 +1,6 @@
 package io.github.NoOne.nMLAcrobatics.maneuvers.railGrind;
 
+import io.github.NoOne.nMLAcrobatics.maneuvers.longJump.LongJump;
 import org.bukkit.Input;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -14,7 +15,9 @@ public class RailGrindListener implements Listener {
         Input input = event.getInput();
 
         if (player.hasMetadata("rail grind")) {
-            if (input.isJump() || input.isSneak()) {
+            if (input.isJump()) {
+                LongJump.railJump(player);
+            } else if (input.isSneak()) {
                 RailGrind.stopRailGrind(player);
             }
         }

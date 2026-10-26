@@ -7,7 +7,6 @@ import io.github.NoOne.nMLEnergy.EnergyManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
-import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
@@ -16,15 +15,23 @@ public class LongJump {
 
     public static void longJump(Player player) {
         double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
-        Vector longJump = player.getLocation().getDirection().normalize().multiply(.9).multiply(speedMultiplier).setY(.5);
+        Vector longJump = player.getLocation().getDirection().multiply(.9).multiply(speedMultiplier).setY(.5);
 
         player.setVelocity(longJump);
+        startLongJumpTask(player);
         EnergyManager.useEnergy(player, 15);
         player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-        player.stopSound(Sound.ENTITY_MINECART_RIDING);
-        player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
         Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Long Jump"));
+    }
+
+    public static void railJump(Player player) {
+        Vector jump = player.getLocation().getDirection().multiply(Math.sqrt(1.22)).setY(.5);
+
+        player.setVelocity(jump);
         startLongJumpTask(player);
+        RailGrind.stopRailGrind(player);
+        EnergyManager.useEnergy(player, 15);
+        player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
     }
 
     public static void startLongJumpTask(Player player) {
@@ -36,7 +43,6 @@ public class LongJump {
                 if (player.isOnGround()) { // rail grind logic
                     if (acrobaticsLevel >= 20 && RailGrind.isGrindable(RailGrind.getBottomBlock(player))) {
                         RailGrind.startRailGrind(player);
-                        player.removeMetadata("long jump", nmlAcrobatics);
                     }
 
                     cancel();
