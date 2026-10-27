@@ -27,11 +27,18 @@ public class LongJump {
     public static void railJump(Player player) {
         Vector jump = player.getLocation().getDirection().multiply(Math.sqrt(1.22)).setY(.5);
 
-        player.setVelocity(jump);
-        startLongJumpTask(player);
         RailGrind.stopRailGrind(player);
-        EnergyManager.useEnergy(player, 15);
-        player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+        player.setVelocity(jump);
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                startLongJumpTask(player);
+                EnergyManager.useEnergy(player, 15);
+                player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+                Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Jump"));
+            }
+        }.runTaskLater(nmlAcrobatics, 2);
     }
 
     public static void startLongJumpTask(Player player) {

@@ -25,8 +25,10 @@ public class RailGrind {
         new BukkitRunnable() {
             @Override
             public void run() {
-                // todo: work on rail jumping and add back sound
-                //  update the wall check so it prioritizes if you can turn before stopping you
+                // todo: make it so if you can turn but also can go straight, prioritize turning if the player is looking in that direction
+                //  the plan for the wall check is to add another hashmap variable or metadata flag to store the players that just turned when rail grinding, that gets removed immediately on the next tick
+                //  if they have that flag = they've turned on that last tick, then temporarily set their rail grind speed lower so they don't fall off from moving
+                //  also go through the backup hit wall check (currently commented out)
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (!player.hasMetadata("rail grind")) return;
@@ -37,21 +39,22 @@ public class RailGrind {
                         continue;
                     }
 
+                    World world = player.getWorld();
                     Vector direction = railGrindDirections.get(player.getUniqueId());
                     BlockFace cardinal = convertVectorToCardinal(direction);
 
                     Block bottomBlock = getBottomBlock(player);
                     Block forwardsBottomBlock = bottomBlock.getRelative(cardinal);
                     Block forwardsBottomBottomBlock = forwardsBottomBlock.getRelative(BlockFace.DOWN);
-                    Block forwardsTopBlock = forwardsBottomBlock.getRelative(BlockFace.UP);
-                    Block eyeBlock = player.getWorld().getBlockAt(forwardsBottomBlock.getLocation().add(0, 2, 0));
+                    Block forwardsBlock = forwardsBottomBlock.getRelative(BlockFace.UP);
                     boolean aboutToFall = !isGrindable(forwardsBottomBlock) && !isGrindable(forwardsBottomBottomBlock);
+                    boolean aboutToHitWall = getIncomingWall(player, cardinal).isSolid();
 
                     // setting the player's velocity
                     player.setVelocity(getRailGrindVelocity(player));
 
                     // turning logic
-                    if (aboutToFall || eyeBlock.isSolid()) {
+                    if (aboutToHitWall || aboutToFall) {
                         BlockFace priorityCardinal = null;
 
                         if (player.getFacing().equals(getLeftCardinal(cardinal))) {
@@ -86,10 +89,17 @@ public class RailGrind {
                         }
                     }
 
+                    // repeat the about to hit a wall check cuz we potentially just changed directions
+//                    aboutToHitWall = getIncomingWall(player, cardinal).isSolid();
+//
+//                    if (aboutToHitWall) {
+//                        stopRailGrind(player);
+//                    }
+
                     // scaling logic
-                    if (forwardsTopBlock.isSolid()) {
-                        if (isGrindable(forwardsTopBlock)) { // if you hit a block at your feet that is grindable, then go on top of it
-                            centerPlayerOnBlock(player, forwardsTopBlock);
+                    if (forwardsBlock.isSolid()) {
+                        if (isGrindable(forwardsBlock)) { // if you hit a block at your feet that is grindable, then go on top of it
+                            centerPlayerOnBlock(player, forwardsBlock);
                         } else { // if it isn't grindable, then you stop there
                             stopRailGrind(player);
                         }
@@ -98,13 +108,12 @@ public class RailGrind {
                     }
 
                     // rail jump indicator
-                    World world = player.getWorld();
                     Location landingLocation = getRailJumpLandingLocation(player);
 
                     if (isGrindable(world.getBlockAt(landingLocation))) {
-                        AbilityEffectsHelper.makeWireFrameRectangle(landingLocation, .6, 1);
+                        AbilityEffectsHelper.makeWireFrameRectangle(landingLocation, .5, .5, .5);
                     } else {
-                        world.spawnParticle(Particle.DUST, landingLocation, 1, 0, 0, 0, 0, new Particle.DustOptions(Color.FUCHSIA, 1));
+                        world.spawnParticle(Particle.ELECTRIC_SPARK, landingLocation, 1, 0, 0, 0, 0);
                     }
                 }
             }
@@ -182,12 +191,9 @@ public class RailGrind {
         Block frontBottomBlock = bottomBlock.getRelative(cardinal);
         Block frontBottomTopBlock = frontBottomBlock.getRelative(BlockFace.UP);
         Block frontBottomBottomBlock = frontBottomBlock.getRelative(BlockFace.DOWN);
+        Block incomingWall = getIncomingWall(player, cardinal);
 
-        return isGrindable(frontBottomBlock) || isGrindable(frontBottomBottomBlock) || isGrindable(frontBottomTopBlock);
-    }
-
-    public static Block getBottomBlock(Player player) {
-        return player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+        return (isGrindable(frontBottomBlock) || isGrindable(frontBottomBottomBlock) || isGrindable(frontBottomTopBlock)) && !incomingWall.isSolid();
     }
 
     private static Vector getCardinalDirection(Player player) {
@@ -202,6 +208,14 @@ public class RailGrind {
         return railGrindDirections.get(player.getUniqueId()).clone().multiply(.7);
     }
 
+    public static Block getBottomBlock(Player player) {
+        return player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+    }
+
+    public static Block getIncomingWall(Player player, BlockFace cardinal) {
+        return player.getWorld().getBlockAt(player.getLocation().add(cardinal.getDirection().setY(1)));
+    }
+
     private static BlockFace convertVectorToCardinal(Vector vector) {
         List<BlockFace> cardinals = List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST);
 
@@ -211,7 +225,7 @@ public class RailGrind {
             }
         }
 
-        return null;
+        return BlockFace.NORTH;
     }
 
     // returns what the left cardinal is to a given cardinal
@@ -251,20 +265,20 @@ public class RailGrind {
         World world = player.getWorld();
         Location playerLocation = player.getLocation();
         Vector planarDirection = playerLocation.getDirection().setY(0);
-        Vector horizontal = planarDirection.clone().multiply(9); // todo: add the playrer's railgrinding velocity to this
+        Vector direction = planarDirection.clone().multiply(9).add(getRailGrindVelocity(player));
 
-        if (player.isSprinting()) { // if the player is sprinting, add a flat extra 4 blocks in the direction. doesnt do that rn
+        if (player.isSprinting()) { // if the player is sprinting, add a flat extra 4 blocks in the direction
             Location location = playerLocation.clone();
 
             location.setPitch(0);
 
             Vector noPitchDirection = location.getDirection().setY(0);
 
-            horizontal.add(noPitchDirection.clone().multiply(3.5));
+            direction.add(noPitchDirection.clone().multiply(1.9));
         }
 
-        Location finalLocation = playerLocation.clone().add(horizontal);
-        Location finalBlockLocation = playerLocation.clone().add(horizontal).toBlockLocation().add(.5, -.5, .5);
+        Location finalLocation = playerLocation.clone().add(direction);
+        Location finalBlockLocation = playerLocation.clone().add(direction).toBlockLocation().add(.5, -.5, .5);
 
         if (isGrindable(world.getBlockAt(finalBlockLocation))) {
             return finalBlockLocation;

@@ -85,7 +85,7 @@
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLAbilities</artifactId>
-            <version>e2b6f8292a</version>
+            <version>c65af98e4b</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
