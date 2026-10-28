@@ -25,10 +25,8 @@ public class RailGrind {
         new BukkitRunnable() {
             @Override
             public void run() {
-                // todo: make it so if you can turn but also can go straight, prioritize turning if the player is looking in that direction
-                //  the plan for the wall check is to add another hashmap variable or metadata flag to store the players that just turned when rail grinding, that gets removed immediately on the next tick
-                //  if they have that flag = they've turned on that last tick, then temporarily set their rail grind speed lower so they don't fall off from moving
-                //  also go through the backup hit wall check (currently commented out)
+                // todo: currently working on a decision chart for the logic behind turning
+                //  standby for it's arrival, worm
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (!player.hasMetadata("rail grind")) return;
@@ -54,7 +52,8 @@ public class RailGrind {
                     player.setVelocity(getRailGrindVelocity(player));
 
                     // turning logic
-                    if (aboutToHitWall || aboutToFall) {
+                    if (aboutToFall || aboutToHitWall) {
+
                         BlockFace priorityCardinal = null;
 
                         if (player.getFacing().equals(getLeftCardinal(cardinal))) {
@@ -71,7 +70,13 @@ public class RailGrind {
                             if (isTurningDirectionValid(player, priorityCardinal)) {
                                 turnPlayer(player, priorityCardinal);
                             } else { // if not, repeat that same check to the opposite cardinal block
-                                BlockFace oppositeCardinal = getOppositeCardinal(priorityCardinal);
+                                BlockFace oppositeCardinal = switch (priorityCardinal) {
+                                    case NORTH -> BlockFace.SOUTH;
+                                    case EAST -> BlockFace.WEST;
+                                    case SOUTH -> BlockFace.NORTH;
+                                    case WEST -> BlockFace.EAST;
+                                    default -> null;
+                                };
 
                                 if (isTurningDirectionValid(player, oppositeCardinal)) {
                                     turnPlayer(player, oppositeCardinal);
@@ -88,13 +93,6 @@ public class RailGrind {
                             }
                         }
                     }
-
-                    // repeat the about to hit a wall check cuz we potentially just changed directions
-//                    aboutToHitWall = getIncomingWall(player, cardinal).isSolid();
-//
-//                    if (aboutToHitWall) {
-//                        stopRailGrind(player);
-//                    }
 
                     // scaling logic
                     if (forwardsBlock.isSolid()) {
@@ -196,6 +194,10 @@ public class RailGrind {
         return (isGrindable(frontBottomBlock) || isGrindable(frontBottomBottomBlock) || isGrindable(frontBottomTopBlock)) && !incomingWall.isSolid();
     }
 
+    public static Block getBottomBlock(Player player) {
+        return player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+    }
+
     private static Vector getCardinalDirection(Player player) {
         return player.getFacing().getDirection();
     }
@@ -205,14 +207,12 @@ public class RailGrind {
     }
 
     private static Vector getRailGrindVelocity(Player player) {
-        return railGrindDirections.get(player.getUniqueId()).clone().multiply(.7);
+        double multiplier = .7;
+
+        return railGrindDirections.get(player.getUniqueId()).clone().multiply(multiplier);
     }
 
-    public static Block getBottomBlock(Player player) {
-        return player.getLocation().getBlock().getRelative(BlockFace.DOWN);
-    }
-
-    public static Block getIncomingWall(Player player, BlockFace cardinal) {
+    private static Block getIncomingWall(Player player, BlockFace cardinal) {
         return player.getWorld().getBlockAt(player.getLocation().add(cardinal.getDirection().setY(1)));
     }
 
@@ -250,24 +250,13 @@ public class RailGrind {
         };
     }
 
-    // returns what the opposite cardinal is to a given cardinal
-    private static BlockFace getOppositeCardinal(BlockFace blockFace) {
-        return switch (blockFace) {
-            case NORTH -> BlockFace.SOUTH;
-            case EAST -> BlockFace.WEST;
-            case SOUTH -> BlockFace.NORTH;
-            case WEST -> BlockFace.EAST;
-            default -> null;
-        };
-    }
-
     private static Location getRailJumpLandingLocation(Player player) {
         World world = player.getWorld();
         Location playerLocation = player.getLocation();
         Vector planarDirection = playerLocation.getDirection().setY(0);
         Vector direction = planarDirection.clone().multiply(9).add(getRailGrindVelocity(player));
 
-        if (player.isSprinting()) { // if the player is sprinting, add a flat extra 4 blocks in the direction
+        if (player.isSprinting()) { // if the player is sprinting, add a flat extra ~2 blocks in the direction
             Location location = playerLocation.clone();
 
             location.setPitch(0);
