@@ -34,6 +34,7 @@ public class NMLAcrobatics extends JavaPlugin {
 
         Speedometer.startSpeedometer();
         RailGrind.startRailGrindTask();
+        RailGrind.startSoundTask();
 
         getServer().getPluginManager().registerEvents(new AcrobaticsListener(this), this);
         getServer().getPluginManager().registerEvents(new RollListener(this), this);

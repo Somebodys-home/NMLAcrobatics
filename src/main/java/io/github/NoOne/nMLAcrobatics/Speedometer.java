@@ -21,20 +21,13 @@ public class Speedometer {
             public void run() {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     UUID uuid = player.getUniqueId();
-                    Location location = player.getLocation();
-                    Location previousLocation = previousLocations.get(uuid);
+                    Location playerLocation = player.getLocation();
+                    Location previousLocation = previousLocations.getOrDefault(uuid, playerLocation);
+                    Vector delta = playerLocation.toVector().subtract(previousLocation.toVector());
 
-                    if (previousLocation != null) {
-                        Vector delta = location.toVector().subtract(previousLocation.toVector());
-
-                        if (delta.lengthSquared() > 0.0001) {
-                            rollDirections.put(uuid, delta.normalize());
-                        }
-
-                        playerSpeeds.put(uuid, previousLocation.distance(location) * 20);
-                    }
-
-                    previousLocations.put(uuid, location);
+                    rollDirections.put(uuid, delta.normalize());
+                    playerSpeeds.put(uuid, previousLocation.distance(playerLocation) * 20);
+                    previousLocations.put(uuid, playerLocation);
                 }
             }
         }.runTaskTimer(nmlAcrobatics, 0, 1);

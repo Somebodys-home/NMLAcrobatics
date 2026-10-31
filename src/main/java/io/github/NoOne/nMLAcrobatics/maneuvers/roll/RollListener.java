@@ -3,6 +3,7 @@ package io.github.NoOne.nMLAcrobatics.maneuvers.roll;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -29,7 +30,7 @@ public class RollListener implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler (priority = EventPriority.MONITOR)
     public void actualRollBraceFromDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player player && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
             if (player.hasMetadata("roll brace")) {
