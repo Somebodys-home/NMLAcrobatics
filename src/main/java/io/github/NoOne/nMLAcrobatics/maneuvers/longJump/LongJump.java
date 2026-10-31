@@ -43,7 +43,19 @@ public class LongJump {
     }
 
     public static void wallJump(Player player) {
+        Vector wallJump = player.getVelocity().add(player.getLocation().getDirection().multiply(.5)).setY(.65);
+
         WallRun.stopWallRunning(player);
+        player.setVelocity(wallJump);
+        player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+        Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Wall Jump"));
+
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                startLongJumpTask(player);
+            }
+        }.runTaskLater(nmlAcrobatics, 10);
     }
 
     public static void startLongJumpTask(Player player) {
@@ -52,8 +64,8 @@ public class LongJump {
 
             @Override
             public void run() {
-                if (acrobaticsLevel >= 30 && !RailGrind.isRailGrinding(player) && WallRun.isAboutToHitAWall(player)) {
-                    WallRun.startWallRunning(player);
+                if (acrobaticsLevel >= 30 && !RailGrind.isRailGrinding(player) && WallRun.getClosetWallCardinal(player) != null) {
+                    WallRun.startWallRunning(player, WallRun.getClosetWallCardinal(player));
                     cancel();
                 }
 

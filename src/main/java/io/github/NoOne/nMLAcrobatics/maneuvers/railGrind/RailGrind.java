@@ -316,24 +316,24 @@ public class RailGrind {
     }
 
     // returns what the left cardinal is to a given cardinal
-    private static BlockFace getLeftCardinal(BlockFace blockFace) {
+    public static BlockFace getLeftCardinal(BlockFace blockFace) {
         return switch (blockFace) {
             case NORTH -> BlockFace.WEST;
             case WEST -> BlockFace.SOUTH;
             case SOUTH -> BlockFace.EAST;
             case EAST -> BlockFace.NORTH;
-            default -> null;
+            default -> BlockFace.SELF;
         };
     }
 
     // returns what the right cardinal is to a given cardinal
-    private static BlockFace getRightCardinal(BlockFace blockFace) {
+    public static BlockFace getRightCardinal(BlockFace blockFace) {
         return switch (blockFace) {
             case NORTH -> BlockFace.EAST;
             case EAST -> BlockFace.SOUTH;
             case SOUTH -> BlockFace.WEST;
             case WEST -> BlockFace.NORTH;
-            default -> null;
+            default -> BlockFace.SELF;
         };
     }
 
