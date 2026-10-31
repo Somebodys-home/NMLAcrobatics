@@ -19,7 +19,7 @@ public class Roll {
     public static void roll(Player player) {
         Location previousLocation = Speedometer.getPreviousLocation(player);
 
-        if (previousLocation != null && Speedometer.getSpeed(player) > 0.5) { // if you're actually moving
+        if (previousLocation != null && Speedometer.getSpeedPerSecond(player) > 0.5) { // if you're actually moving
             Vector roll = Speedometer.getRollDirection(player).multiply(2).setY(0);
 
             player.setMetadata("roll cooldown", new FixedMetadataValue(nmlAcrobatics, true));

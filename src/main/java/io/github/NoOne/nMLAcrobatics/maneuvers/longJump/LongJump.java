@@ -3,6 +3,7 @@ package io.github.NoOne.nMLAcrobatics.maneuvers.longJump;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import io.github.NoOne.nMLAcrobatics.maneuvers.PerformedManeuverEvent;
 import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrind;
+import io.github.NoOne.nMLAcrobatics.maneuvers.wallRun.WallRun;
 import io.github.NoOne.nMLEnergy.EnergyManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
@@ -41,18 +42,25 @@ public class LongJump {
         }.runTaskLater(nmlAcrobatics, 2);
     }
 
+    public static void wallJump(Player player) {
+        WallRun.stopWallRunning(player);
+    }
+
     public static void startLongJumpTask(Player player) {
         new BukkitRunnable() {
             int acrobaticsLevel = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
 
             @Override
             public void run() {
-                if (player.isOnGround()) { // rail grind logic
-                    if (acrobaticsLevel >= 20 && RailGrind.isGrindable(RailGrind.getBottomBlock(player))) {
-                        RailGrind.startRailGrind(player);
-                    }
-
+                if (acrobaticsLevel >= 30 && !RailGrind.isRailGrinding(player) && WallRun.isAboutToHitAWall(player)) {
+                    WallRun.startWallRunning(player);
                     cancel();
+                }
+
+                if (player.isOnGround()) { // rail grind logic
+                    cancel();
+
+                    if (acrobaticsLevel >= 20 && RailGrind.isGrindable(RailGrind.getBottomBlock(player))) RailGrind.startRailGrind(player);
                 }
 //                else { // climbing logic
 //                    int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();

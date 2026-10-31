@@ -6,6 +6,8 @@ import io.github.NoOne.nMLAcrobatics.maneuvers.longJump.LongJumpListener;
 import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrind;
 import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrindListener;
 import io.github.NoOne.nMLAcrobatics.maneuvers.roll.RollListener;
+import io.github.NoOne.nMLAcrobatics.maneuvers.wallRun.WallRun;
+import io.github.NoOne.nMLAcrobatics.maneuvers.wallRun.WallRunListener;
 import io.github.NoOne.nMLPlayerStats.NMLPlayerStats;
 import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
 import io.github.NoOne.nMLSkills.NMLSkills;
@@ -35,11 +37,13 @@ public class NMLAcrobatics extends JavaPlugin {
         Speedometer.startSpeedometer();
         RailGrind.startRailGrindTask();
         RailGrind.startSoundTask();
+        WallRun.startWallRunTask();
 
         getServer().getPluginManager().registerEvents(new AcrobaticsListener(this), this);
         getServer().getPluginManager().registerEvents(new RollListener(this), this);
         getServer().getPluginManager().registerEvents(new LongJumpListener(this), this);
         getServer().getPluginManager().registerEvents(new RailGrindListener(), this);
+        getServer().getPluginManager().registerEvents(new WallRunListener(), this);
     }
 
     @Override

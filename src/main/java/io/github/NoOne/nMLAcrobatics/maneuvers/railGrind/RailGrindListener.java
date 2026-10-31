@@ -16,7 +16,7 @@ public class RailGrindListener implements Listener {
         Player player = event.getPlayer();
         Input input = event.getInput();
 
-        if (player.hasMetadata("rail grind")) {
+        if (RailGrind.isRailGrinding(player)) {
             if (input.isJump()) {
                 LongJump.railJump(player);
             } else if (input.isSneak()) {

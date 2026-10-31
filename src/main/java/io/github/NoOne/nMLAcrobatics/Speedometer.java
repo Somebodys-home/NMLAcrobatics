@@ -41,7 +41,11 @@ public class Speedometer {
         return rollDirections.get(player.getUniqueId());
     }
 
-    public static double getSpeed(Player player) {
+    public static double getSpeedPerSecond(Player player) {
         return playerSpeeds.get(player.getUniqueId());
+    }
+
+    public static double getSpeedPerTick(Player player) {
+        return getSpeedPerSecond(player) / 20;
     }
 }

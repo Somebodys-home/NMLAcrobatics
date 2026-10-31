@@ -18,7 +18,7 @@ import java.util.UUID;
 
 public class RailGrind {
     private static NMLAcrobatics nmlAcrobatics = NMLAcrobatics.getInstance();
-    private static HashMap<UUID, Vector> railGrindDirections = new HashMap<>(); // the direction that the player is grinding in
+    private static HashMap<UUID, Vector> railGrindDirections = new HashMap<>(); // the cardinal direction that the player is grinding in
     private static HashMap<UUID, Double> railGrindSpeeds = new HashMap<>(); // the speed that the player is grinding at
     private static HashMap<UUID, Float> playerWalkSpeeds = new HashMap<>(); // we set the players movement speed to 0 when rail grinding, so make sure to save the value it was before
     private static HashMap<UUID, Block> pivotedBlocks = new HashMap<>(); // stores the blocks that a player previously turned on
@@ -33,7 +33,7 @@ public class RailGrind {
             public void run() {
 
                 for (Player player : Bukkit.getOnlinePlayers()) {
-                    if (!isGrinding(player)) continue;
+                    if (!isRailGrinding(player)) continue;
                     if (!isGrindable(getBottomBlock(player))) { // player has fallen off the rail :T
                         stopRailGrind(player);
                         fellOffRailTask(player);
@@ -131,7 +131,7 @@ public class RailGrind {
 
         railGrindDirections.put(uuid, player.getFacing().getDirection());
         playerWalkSpeeds.put(uuid, player.getWalkSpeed());
-        railGrindSpeeds.put(uuid, Speedometer.getSpeed(player));
+        railGrindSpeeds.put(uuid, Speedometer.getSpeedPerSecond(player));
         centerPlayerOnBlock(player);
         player.setWalkSpeed(0);
         startPlayingSound(player);
@@ -217,13 +217,7 @@ public class RailGrind {
             if (isTurningDirectionValid(player, priorityCardinal)) {
                 turnPlayer(player, priorityCardinal);
             } else { // if not, repeat that same check to the opposite cardinal block
-                BlockFace oppositeCardinal = switch (priorityCardinal) {
-                    case NORTH -> BlockFace.SOUTH;
-                    case EAST -> BlockFace.WEST;
-                    case SOUTH -> BlockFace.NORTH;
-                    case WEST -> BlockFace.EAST;
-                    default -> null;
-                };
+                BlockFace oppositeCardinal = priorityCardinal.getOppositeFace();
 
                 if (isTurningDirectionValid(player, oppositeCardinal)) {
                     turnPlayer(player, oppositeCardinal);
@@ -249,7 +243,7 @@ public class RailGrind {
         new BukkitRunnable() {
             @Override
             public void run() {
-                if (!soundTimers.containsKey(player.getUniqueId()) && isGrinding(player)) {
+                if (!soundTimers.containsKey(player.getUniqueId()) && isRailGrinding(player)) {
                     startPlayingSound(player);
                 }
             }
@@ -262,7 +256,7 @@ public class RailGrind {
         return blockType.contains("FENCE") || blockType.contains("GATE") || blockType.contains("BARS") || blockType.contains("WALL");
     }
 
-    private static boolean isGrinding(Player player) {
+    public static boolean isRailGrinding(Player player) {
         return player.hasMetadata("rail grind");
     }
 
@@ -309,7 +303,7 @@ public class RailGrind {
         return player.getWorld().getBlockAt(player.getLocation().add(cardinal.getDirection().setY(1)));
     }
 
-    private static BlockFace convertVectorToCardinal(Vector vector) {
+    public static BlockFace convertVectorToCardinal(Vector vector) {
         List<BlockFace> cardinals = List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST);
 
         for (BlockFace blockFace : cardinals) {

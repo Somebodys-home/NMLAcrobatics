@@ -1,26 +1,23 @@
 package io.github.NoOne.nMLAcrobatics.maneuvers;
 
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
-import io.github.NoOne.nMLAcrobatics.Speedometer;
 import io.github.NoOne.nMLEnergy.EnergyManager;
 import org.bukkit.*;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Objects;
+import java.util.UUID;
 
 public class Maneuvers {
     private static NMLAcrobatics nmlAcrobatics;
     private BukkitTask wallRunTask;
-    private static HashMap<UUID, Integer> railGrindSoundTicks = new HashMap<>();
-    private static HashMap<UUID, String> lastSuccessfulRailGrindDirection = new HashMap<>();
-    private static HashMap<UUID, Location> lastDirectionChangeLocation = new HashMap<>();
-    private static HashMap<UUID, Location> railGrindParticleLocation = new HashMap<>();
     private static HashMap<UUID, Vector> wallCardinals = new HashMap<>(); // only to know where to push the player back to when on a wall
     private static HashMap<UUID, Double> wallRunSpeeds = new HashMap<>(); // speed that you start wall running at
     private static HashMap<UUID, Integer> wallRunTimes = new HashMap<>(); // the amount of time that you spend wall running
@@ -102,64 +99,6 @@ public class Maneuvers {
         wallRunTask.cancel();
     }
 
-    public static void railGrind(Player player) {
-        player.sendMessage("speed: " + Speedometer.getSpeed(player));
-        player.setMetadata("rail grind", new FixedMetadataValue(nmlAcrobatics, true));
-        player.playSound(player, Sound.ITEM_TRIDENT_RETURN, 2f, 1f);
-
-        float yaw = player.getLocation().getYaw();
-        yaw = (yaw % 360 + 360) % 360; // Normalize yaw to 0–360
-
-        if (yaw >= 45 && yaw < 135) {
-            lastSuccessfulRailGrindDirection.put(player.getUniqueId(), "west");
-        } else if (yaw >= 135 && yaw < 225) {
-            lastSuccessfulRailGrindDirection.put(player.getUniqueId(), "north");
-        } else if (yaw >= 225 && yaw < 315) {
-            lastSuccessfulRailGrindDirection.put(player.getUniqueId(), "east");
-        } else {
-            lastSuccessfulRailGrindDirection.put(player.getUniqueId(), "south");
-        }
-
-        centerPlayer(player);
-        railGrindSoundTicks.put(player.getUniqueId(), 29);
-        EnergyManager.pauseEnergyRegen(player);
-        Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Grind"));
-        player.setMetadata("no jumping", new FixedMetadataValue(nmlAcrobatics, true));
-
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                player.removeMetadata("no jumping", nmlAcrobatics);
-            }
-        }.runTaskLater(nmlAcrobatics, 1);
-    }
-
-    public static void stopRailGrinding(Player player) {
-        UUID uuid = player.getUniqueId();
-        ManeuverCombos maneuverCombos = nmlAcrobatics.getManeuverCombos();
-
-        player.removeMetadata("rail grind", nmlAcrobatics);
-        player.stopSound(Sound.ENTITY_MINECART_RIDING);
-        lastSuccessfulRailGrindDirection.remove(uuid);
-        lastDirectionChangeLocation.remove(uuid);
-        maneuverCombos.startComboDepleteTask(player);
-        EnergyManager.resumeEnergyRegen(player);
-    }
-
-    public static void railJump(Player player, double speed) {
-        Location particleLocation = railGrindParticleLocation.get(player.getUniqueId());
-        Vector railJump = particleLocation.subtract(player.getLocation()).toVector().multiply(.12).setY(.55);
-
-        player.setVelocity(railJump.multiply(Math.max(1, speed)));
-        EnergyManager.useEnergy(player, 10);
-        player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-        player.stopSound(Sound.ENTITY_MINECART_RIDING);
-        player.setMetadata("long jump", new FixedMetadataValue(nmlAcrobatics, true));
-        player.removeMetadata("rail grind", nmlAcrobatics);
-        postJumpRunnable(player).runTaskTimer(nmlAcrobatics, 5, 1);
-        Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Rail Jump"));
-    }
-
     public static void startWallRun(Player player, Vector wallCardinal) {
         if (!wallRunSpeeds.containsKey(player.getUniqueId())) {
             wallRunSpeeds.put(player.getUniqueId(), player.getVelocity().length());
@@ -237,10 +176,7 @@ public class Maneuvers {
             @Override
             public void run() {
                 if (player.isOnGround()) { // rail grind logic
-                    if (nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel() >= 20 &&
-                            isGrindable(player.getLocation().getBlock().getRelative(BlockFace.DOWN))) {
-
-                        railGrind(player);
+                    if (nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel() >= 20) {
                         player.removeMetadata("long jump", nmlAcrobatics);
                         canceled = true;
                         cancel();
@@ -295,123 +231,11 @@ public class Maneuvers {
         }.runTaskTimer(nmlAcrobatics, 10, 1);
     }
 
-    private static void centerPlayer(Player player) {
-        Location loc = player.getLocation();
-        float yaw = player.getLocation().getYaw();
-        float pitch = player.getLocation().getPitch();
-
-        loc.setX(loc.getBlockX() + 0.5);
-        loc.setY(loc.getBlockY()); // keep current Y
-        loc.setZ(loc.getBlockZ() + 0.5);
-        loc.setYaw(yaw); // keep facing the same way
-        loc.setPitch(pitch);
-
-        player.teleport(loc.add(0, .5, 0));
-    }
-
-    private static BukkitRunnable postJumpRunnable(Player player) {
-        return new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (player.isOnGround()) { // rail grind logic
-                    if (nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel() >= 20 &&
-                            isGrindable(player.getLocation().getBlock().getRelative(BlockFace.DOWN))) {
-
-                        railGrind(player);
-                        player.removeMetadata("long jump", nmlAcrobatics);
-                    }
-
-                    cancel();
-                }
-                else { // climbing logic
-                    int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
-
-                    if (acrobaticsLvl >= 30) {
-                        Vector playerDir = player.getLocation().getDirection().clone().setY(0);
-
-                        if (playerDir.lengthSquared() < 1e-6) {
-                            double yawRad = Math.toRadians(player.getLocation().getYaw());
-                            playerDir = new Vector(-Math.sin(yawRad), 0, Math.cos(yawRad));
-                        }
-
-                        Vector forward = playerDir.clone().normalize().multiply(1.2);
-                        Vector right = playerDir.clone().crossProduct(new Vector(0, 1, 0)).setY(0).normalize();
-                        Vector left = right.clone().multiply(-1);
-                        Location leftLoc = player.getLocation().clone().add(left);
-                        Location forwardLoc = player.getLocation().clone().add(forward);
-                        Location rightLoc = player.getLocation().clone().add(right);
-
-                        Block leftTop = leftLoc.clone().add(0, 1, 0).getBlock();
-                        Block leftBottom = leftLoc.getBlock();
-                        Block forwardTop = forwardLoc.clone().add(0, 1, 0).getBlock();
-                        Block forwardBottom = forwardLoc.getBlock();
-                        Block rightTop = rightLoc.clone().add(0, 1, 0).getBlock();
-                        Block rightBottom = rightLoc.getBlock();
-
-                        if (leftTop.isSolid() && leftBottom.isSolid()) {
-                            startWallRun(player, snapToCardinal(left));
-                            player.removeMetadata("long jump", nmlAcrobatics);
-                            cancel();
-                        }
-                        else if (forwardTop.isSolid() && forwardBottom.isSolid()) {
-                            startWallRun(player, snapToCardinal(forward));
-                            player.removeMetadata("long jump", nmlAcrobatics);
-                            cancel();
-                        }
-                        else if (rightTop.isSolid() && rightBottom.isSolid()) {
-                            startWallRun(player, snapToCardinal(right));
-                            player.removeMetadata("long jump", nmlAcrobatics);
-                            cancel();
-                        }
-                    }
-                }
-            }
-        };
-    }
-
     private static Block getTopBlock(Player player, double distance) {
         Vector top = player.getLocation().getDirection().setY(0).normalize().multiply(distance);
         Location topLocation = player.getLocation().clone().add(top).add(0, 1.75, 0);
 
         return topLocation.getBlock();
-    }
-
-    private static Location calculateRailJumpLandingPosition(Player player, double speedMultiplier) {
-        Location playerLocation = player.getLocation();
-        Vector playerDirection = playerLocation.getDirection();
-        double y = playerLocation.getY() - 1;
-        double pitch = playerLocation.getPitch();
-        double multiplier = (((-1 / 540.0) * Math.pow(pitch, 2)) + ((1 / 90.0) * pitch) + 10) * speedMultiplier;
-
-        playerLocation.add(playerDirection.multiply(multiplier)).setY(y);
-        return playerLocation;
-    }
-
-    private static List<Location> createHollowCube(Location corner1, Location corner2, double particleDistance) {
-        List<Location> result = new ArrayList<>();
-        World world = corner1.getWorld();
-        double minX = Math.min(corner1.getX(), corner2.getX());
-        double minY = Math.min(corner1.getY(), corner2.getY());
-        double minZ = Math.min(corner1.getZ(), corner2.getZ());
-        double maxX = Math.max(corner1.getX(), corner2.getX());
-        double maxY = Math.max(corner1.getY(), corner2.getY());
-        double maxZ = Math.max(corner1.getZ(), corner2.getZ());
-
-        for (double x = minX; x <= maxX; x+=particleDistance) {
-            for (double y = minY; y <= maxY; y+=particleDistance) {
-                for (double z = minZ; z <= maxZ; z+=particleDistance) {
-                    int components = 0;
-                    if (x == minX || x == maxX) components++;
-                    if (y == minY || y == maxY) components++;
-                    if (z == minZ || z == maxZ) components++;
-                    if (components >= 2) {
-                        result.add(new Location(world, x, y, z));
-                    }
-                }
-            }
-        }
-
-        return result;
     }
 
     private static Vector getClosestWallCardinal(Player player) {
@@ -472,20 +296,5 @@ public class Maneuvers {
         blocks.removeIf(block -> block.getType().isAir());
 
         return !blocks.isEmpty();
-    }
-
-    private static boolean isGrindable(Block block) {
-        return block.getType() == Material.OAK_FENCE || block.getType() == Material.OAK_FENCE_GATE ||
-                block.getType() == Material.SPRUCE_FENCE || block.getType() == Material.SPRUCE_FENCE_GATE ||
-                block.getType() == Material.BIRCH_FENCE || block.getType() == Material.BIRCH_FENCE_GATE ||
-                block.getType() == Material.JUNGLE_FENCE || block.getType() == Material.JUNGLE_FENCE_GATE ||
-                block.getType() == Material.ACACIA_FENCE || block.getType() == Material.ACACIA_FENCE_GATE ||
-                block.getType() == Material.DARK_OAK_FENCE || block.getType() == Material.DARK_OAK_FENCE_GATE ||
-                block.getType() == Material.MANGROVE_FENCE || block.getType() == Material.MANGROVE_FENCE_GATE ||
-                block.getType() == Material.CHERRY_FENCE || block.getType() == Material.CHERRY_FENCE_GATE ||
-                block.getType() == Material.BAMBOO_FENCE || block.getType() == Material.BAMBOO_FENCE_GATE ||
-                block.getType() == Material.CRIMSON_FENCE || block.getType() == Material.CRIMSON_FENCE_GATE ||
-                block.getType() == Material.WARPED_FENCE || block.getType() == Material.WARPED_FENCE_GATE ||
-                block.getType() == Material.NETHER_BRICK_FENCE || block.getType() == Material.IRON_BARS;
     }
 }
