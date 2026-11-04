@@ -85,13 +85,13 @@
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLAbilities</artifactId>
-            <version>c65af98e4b</version>
+            <version>033cbc1770</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLEnergy</artifactId>
-            <version>c25b309325</version>
+            <version>87d9031c8c</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

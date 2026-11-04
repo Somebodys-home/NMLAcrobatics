@@ -1,12 +1,13 @@
 package io.github.NoOne.nMLAcrobatics.maneuvers.wallRun;
 
+import io.github.NoOne.nMLAbilities.abilitySystem.abilityEffects.AbilityEffectsHelper;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import io.github.NoOne.nMLAcrobatics.Speedometer;
 import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrind;
-import org.bukkit.Bukkit;
-import org.bukkit.GameMode;
-import org.bukkit.Sound;
-import org.bukkit.World;
+import io.github.NoOne.nMLEnergy.EnergyManager;
+import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
+import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
@@ -21,57 +22,81 @@ import java.util.UUID;
 
 public class WallRun {
     private static NMLAcrobatics nmlAcrobatics = NMLAcrobatics.getInstance();
+    private static ProfileManager profileManager = NMLAcrobatics.getInstance().getProfileManager();
     private static HashMap<UUID, Vector> wallRunDirections = new HashMap<>(); // the cardinal direction that the player is wall running in
     private static HashMap<UUID, Double> wallRunSpeeds = new HashMap<>(); // the speeds that the players started wall running in
     private static HashMap<UUID, Integer> wallRunTimes = new HashMap<>(); // the amount of time that you spend wall running
-    private static Sound pingSound = Sound.ITEM_TRIDENT_RETURN;
     private static String wallRunString = "wall running";
 
     public static void startWallRunTask() {
-        // todo: pause energy regen and use energy while wall running
         new BukkitRunnable() {
 
             @Override
             public void run() {
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (!WallRun.isWallRunning(player)) continue;
-                    if (player.isOnGround()) {
-                        stopWallRunning(player);
-                        continue;
-                    }
 
                     UUID uuid = player.getUniqueId();
                     Vector direction = wallRunDirections.get(uuid);
                     BlockFace cardinal = RailGrind.convertVectorToCardinal(wallRunDirections.get(uuid));
+                    Block bottomWallBlock = getWall(player, cardinal).getFirst();
+
+                    // stop wall running if the player hits the ground or isnt touching the wall anymore
+                    if (player.isOnGround() || !isTouchingWall(player)) {
+                        stopWallRunning(player);
+                        continue;
+                    }
 
                     // give the player constant falling velocity while wall running
                     int time = wallRunTimes.get(uuid);
-                    double speed = wallRunSpeeds.get(uuid) * .05;
+                    double speed = wallRunSpeeds.get(uuid) * .085;
                     double downwardsSpeed = Math.pow(time, 2) / -1750;
                     Vector playerDirection = player.getLocation().getDirection();
 
                     player.setVelocity(player.getVelocity().add(playerDirection.multiply(speed).setY(downwardsSpeed)));
+
+                    // sound & effects
+                    int interval;
+
+                    try {
+                        interval = (int) (3 / Speedometer.getSpeedPerTick(player));
+                    } catch (Exception e) {
+                        interval = 0;
+                    }
+
+                    if (interval == 0 || time % interval == 0) player.playSound(player, bottomWallBlock.getBlockSoundGroup().getStepSound(), .5f, 1f);
+                    if (time % 7 == 0 && Speedometer.getSpeedPerSecond(player) >= 18) {
+                        AbilityEffectsHelper.verticalParticleCircleInFrontOfEntity(new Particle.DustOptions(Color.WHITE, 1f), player, 1.25, 60, 3);
+                    }
+
+                    // spawn block particle at the players feet
+                    player.spawnParticle(Particle.BLOCK, player.getLocation().add(new Vector(0, .5, 0)), 5, .05, .05, .05, bottomWallBlock.getBlockData());
                     wallRunTimes.put(uuid, time + 1);
 
-                    // if the player isnt touching a wall, then stop wall running
-                    if (!isTouchingWall(player)) {
-                        ArrayList<Block> wallBlocks = getWall(player, cardinal);
+                    // pull up when the head block is solid and the block above the head block isn't solid and youre looking in the direction of the wall
+                    // have to specify that last bit so this doesn't trigger when a player runs off a wall
+                    Block pullUpBlock = player.getWorld().getBlockAt(player.getLocation().add(direction.clone().add(new Vector(0, 2, 0))));
 
-                        // pull up when the head block isn't solid (but the bottom one is)
-                        // have to specify that last bit so this doesn't trigger when a player runs off a wall
-                        if (!wallBlocks.getLast().isSolid() && wallBlocks.getFirst().isSolid()) {
-                            player.setVelocity(new Vector(0, .66, 0).add(direction.multiply(.2)));
-                            player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-
-                            new BukkitRunnable() {
-                                @Override
-                                public void run() {
-                                    player.setVelocity(player.getVelocity().add(direction.multiply(.2)));
-                                }
-                            }.runTaskLater(nmlAcrobatics, 5);
-                        }
-
+                    if (!pullUpBlock.isSolid() && bottomWallBlock.isSolid() && player.getFacing() == cardinal) {
                         stopWallRunning(player);
+                        player.setVelocity(new Vector(0, .66, 0));
+                        player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+
+                        new BukkitRunnable() {
+                            @Override
+                            public void run() {
+                                player.setVelocity(player.getVelocity().add(direction.multiply(.075)));
+                            }
+                        }.runTaskLater(nmlAcrobatics, 3);
+                    }
+
+                    // energy use
+                    Stats stats = profileManager.getPlayerProfile(uuid).getStats();
+
+                    if (stats.getCurrentEnergy() < 5) {
+                        stopWallRunning(player);
+                    } else {
+                        EnergyManager.useEnergy(player, .25); // 5 energy/s
                     }
                 }
             }
@@ -85,9 +110,12 @@ public class WallRun {
         wallRunDirections.put(uuid, cardinal.getDirection());
         wallRunSpeeds.put(uuid, Speedometer.getSpeedPerTick(player));
         wallRunTimes.put(uuid, 0);
-        player.playSound(player.getLocation(), pingSound, 1, 1);
+        player.playSound(player.getLocation(), Sound.ITEM_TRIDENT_RETURN, 1, 1);
+        EnergyManager.pauseEnergyRegen(player);
+        AbilityEffectsHelper.putOnInfiniteCooldown(player);
         player.setAllowFlight(true); // flight is how we make the player stay on the wall
         player.setFlying(true);
+        player.setFlySpeed(.075f);
     }
 
     public static void stopWallRunning(Player player) {
@@ -97,7 +125,10 @@ public class WallRun {
         wallRunDirections.remove(uuid);
         wallRunSpeeds.remove(uuid);
         wallRunTimes.remove(uuid);
+        EnergyManager.resumeEnergyRegen(player);
+        AbilityEffectsHelper.removeInfiniteCooldown(player);
         player.setFlying(false);
+        player.setFlySpeed(.1f);
 
         if (player.getGameMode() != GameMode.CREATIVE) {
             player.setAllowFlight(false);
@@ -145,6 +176,10 @@ public class WallRun {
         } else {
             return null;
         }
+    }
+
+    public static Vector getWallRunDirection(Player player) {
+        return wallRunDirections.get(player.getUniqueId());
     }
 
     // returns an arraylist of blocks that's to the (CARDINAL) of a player

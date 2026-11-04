@@ -3,6 +3,7 @@ package io.github.NoOne.nMLAcrobatics.maneuvers.railGrind;
 import io.github.NoOne.nMLAbilities.abilitySystem.abilityEffects.AbilityEffectsHelper;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import io.github.NoOne.nMLAcrobatics.Speedometer;
+import io.github.NoOne.nMLEnergy.EnergyManager;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -36,7 +37,7 @@ public class RailGrind {
                     if (!isRailGrinding(player)) continue;
                     if (!isGrindable(getBottomBlock(player))) { // player has fallen off the rail :T
                         stopRailGrind(player);
-                        fellOffRailTask(player);
+                        startFellOffRailTask(player);
 
                         continue;
                     }
@@ -136,6 +137,8 @@ public class RailGrind {
         player.setWalkSpeed(0);
         startPlayingSound(player);
         player.setMetadata("rail grind", new FixedMetadataValue(nmlAcrobatics, true));
+        AbilityEffectsHelper.putOnInfiniteCooldown(player);
+        EnergyManager.pauseEnergyRegen(player);
     }
 
     public static void stopRailGrind(Player player) {
@@ -146,10 +149,12 @@ public class RailGrind {
         stopPlayingSound(player);
         pivotedBlocks.remove(uuid);
         heightBlocks.remove(uuid);
+        AbilityEffectsHelper.removeInfiniteCooldown(player);
+        EnergyManager.resumeEnergyRegen(player);
     }
 
     // when the player falls off a rail, they can continue a rail grind if they land on a rail
-    private static void fellOffRailTask(Player player) {
+    private static void startFellOffRailTask(Player player) {
         player.setVelocity(getRailGrindVelocity(player));
 
         new BukkitRunnable() {

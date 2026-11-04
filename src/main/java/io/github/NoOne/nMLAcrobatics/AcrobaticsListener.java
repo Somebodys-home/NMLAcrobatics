@@ -1,6 +1,5 @@
 package io.github.NoOne.nMLAcrobatics;
 
-import io.github.NoOne.nMLAcrobatics.maneuvers.Maneuvers;
 import io.github.NoOne.nMLAcrobatics.maneuvers.PerformedManeuverEvent;
 import io.github.NoOne.nMLAcrobatics.maneuvers.roll.Roll;
 import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
@@ -18,7 +17,6 @@ import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerInputEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.metadata.FixedMetadataValue;
@@ -42,18 +40,18 @@ public class AcrobaticsListener implements Listener {
             Skills skills = skillSetManager.getSkillSet(player.getUniqueId()).getSkills();
             Stats stats = profileManager.getPlayerProfile(player.getUniqueId()).getStats();
             int change = (int) event.getChange();
-            int prevlevel = Math.max(skills.getAcrobaticsLevel() - change, 1);
-            int newlevel = skills.getAcrobaticsLevel();
+            int prevLevel = Math.max(skills.getAcrobaticsLevel() - change, 1);
+            int newLevel = skills.getAcrobaticsLevel();
 
             player.playSound(player, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
 
-            /// chat message
+            // chat message
             player.sendMessage("§f§l---------------------------");
             player.sendMessage("§f§lACROBATICS SKILL LEVEL UP!");
-            player.sendMessage("§fLv. §r§8" + prevlevel + " -> §r§b" + newlevel + " §r§fAcrobat");
+            player.sendMessage("§fLv. §r§8" + prevLevel + " -> §r§b" + newLevel + " §r§fAcrobat");
             player.sendMessage("");
 
-            if (newlevel >= 10 && prevlevel < 10) {
+            if (newLevel >= 10 && prevLevel < 10) {
                 player.sendMessage("§b§lMANEUVER LEARNED: LONG JUMP");
                 player.sendMessage("§8§o(Run + Shift + Jump)");
                 player.sendMessage("§f§oIt's a bigger jump! Neato!");
@@ -63,7 +61,7 @@ public class AcrobaticsListener implements Listener {
                 player.sendMessage("");
             }
 
-            if (newlevel >= 20 && prevlevel < 20) {
+            if (newLevel >= 20 && prevLevel < 20) {
                 player.sendMessage("§b§lMANEUVER LEARNED: RAIL GRIND");
                 player.sendMessage("§f§oGrind on rails after a long jump!");
                 player.sendMessage("");
@@ -72,7 +70,7 @@ public class AcrobaticsListener implements Listener {
                 player.sendMessage("");
             }
 
-            if (newlevel >= 30 && prevlevel < 30) {
+            if (newLevel >= 30 && prevLevel < 30) {
                 player.sendMessage("§b§lMANEUVER LEARNED: WALL RUN");
                 player.sendMessage("§f§oRun across walls after a long jump!");
                 player.sendMessage("");
@@ -81,10 +79,10 @@ public class AcrobaticsListener implements Listener {
                 player.sendMessage("");
             }
 
-            if (newlevel % 2 == 0) {
-                int speedChange = Math.max((newlevel - prevlevel) / 2, 1);
+            if (newLevel % 2 == 0) {
+                int speedChange = Math.max((newLevel - prevLevel) / 2, 1);
 
-                if (prevlevel < 2 && newlevel >= 2) {
+                if (prevLevel < 2 && newLevel >= 2) {
                     speedChange++;
                 }
 
@@ -138,24 +136,6 @@ public class AcrobaticsListener implements Listener {
                 player.setMetadata("roll brace", new FixedMetadataValue(nmlAcrobatics, true));
                 player.playSound(player, Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1f);
             }
-        }
-    }
-
-    @EventHandler
-    public void wallJump(PlayerInputEvent event) {
-        Player player = event.getPlayer();
-
-        if (player.hasMetadata("wall run") && event.getInput().isJump()) {
-            Maneuvers.wallJump(player);
-        }
-    }
-
-    @EventHandler
-    public void stopWallRunning(PlayerToggleSneakEvent event) {
-        Player player = event.getPlayer();
-
-        if (event.isSneaking() && player.hasMetadata("wall run")) {
-            Maneuvers.stopWallRunning(player);
         }
     }
 

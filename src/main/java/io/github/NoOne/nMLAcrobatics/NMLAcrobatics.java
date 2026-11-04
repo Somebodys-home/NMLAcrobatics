@@ -1,7 +1,6 @@
 package io.github.NoOne.nMLAcrobatics;
 
 import io.github.NoOne.nMLAcrobatics.maneuvers.ManeuverCombos;
-import io.github.NoOne.nMLAcrobatics.maneuvers.Maneuvers;
 import io.github.NoOne.nMLAcrobatics.maneuvers.longJump.LongJumpListener;
 import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrind;
 import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrindListener;
@@ -20,7 +19,6 @@ public class NMLAcrobatics extends JavaPlugin {
     private static NMLAcrobatics instance;
     private ProfileManager profileManager;
     private SkillSetManager skillSetManager;
-    private Maneuvers maneuvers;
     private ManeuverCombos maneuverCombos;
 
     @Override
@@ -28,10 +26,6 @@ public class NMLAcrobatics extends JavaPlugin {
         instance = this;
         profileManager = JavaPlugin.getPlugin(NMLPlayerStats.class).getProfileManager();
         skillSetManager = JavaPlugin.getPlugin(NMLSkills.class).getSkillSetManager();
-
-        maneuvers = new Maneuvers(this);
-        maneuvers.startWallRunTask();
-
         maneuverCombos = new ManeuverCombos(this);
 
         Speedometer.startSpeedometer();
@@ -52,7 +46,6 @@ public class NMLAcrobatics extends JavaPlugin {
             player.removeMetadata("fishing_combo", this);
         }
 
-        maneuvers.stopTasks();
 //        maneuverCombos.stop();
     }
 

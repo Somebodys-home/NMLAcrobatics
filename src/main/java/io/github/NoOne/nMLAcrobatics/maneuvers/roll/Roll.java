@@ -1,10 +1,10 @@
 package io.github.NoOne.nMLAcrobatics.maneuvers.roll;
 
+import io.github.NoOne.nMLAbilities.abilitySystem.abilityEffects.AbilityEffectsHelper;
 import io.github.NoOne.nMLAbilities.abilitySystem.cooldownSystem.CooldownManager;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import io.github.NoOne.nMLAcrobatics.Speedometer;
 import io.github.NoOne.nMLAcrobatics.maneuvers.PerformedManeuverEvent;
-import io.github.NoOne.nMLEnergy.EnergyManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Sound;
@@ -32,8 +32,7 @@ public class Roll {
             }.runTaskLater(nmlAcrobatics, 30);
 
             player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-            EnergyManager.useEnergy(player, 10);
-            CooldownManager.putOnHardCooldown(player, 1.5);
+            AbilityEffectsHelper.useEnergyAndCooldown(player, 10, 1);
             player.setVelocity(roll);
             Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Roll"));
         }

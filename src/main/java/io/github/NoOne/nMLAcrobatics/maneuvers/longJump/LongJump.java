@@ -5,6 +5,7 @@ import io.github.NoOne.nMLAcrobatics.maneuvers.PerformedManeuverEvent;
 import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrind;
 import io.github.NoOne.nMLAcrobatics.maneuvers.wallRun.WallRun;
 import io.github.NoOne.nMLEnergy.EnergyManager;
+import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -13,6 +14,7 @@ import org.bukkit.util.Vector;
 
 public class LongJump {
     private static NMLAcrobatics nmlAcrobatics = NMLAcrobatics.getInstance();
+    private static ProfileManager profileManager = NMLAcrobatics.getInstance().getProfileManager();
 
     public static void longJump(Player player) {
         double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
@@ -43,19 +45,33 @@ public class LongJump {
     }
 
     public static void wallJump(Player player) {
-        Vector wallJump = player.getVelocity().add(player.getLocation().getDirection().multiply(.5)).setY(.65);
+        Vector direction = WallRun.getWallRunDirection(player);
+        Vector wallJump;
+        int delay;
+
+        if (player.getTargetBlock(null, 1).isSolid()) { // if the player is looking at a wall, then jump straight up
+            wallJump = new Vector(0, .6, 0);
+            delay = 10;
+        } else { // if they're not, then jump in the direction they're looking + the opposite direction of their cardinal
+            wallJump = player.getVelocity().add(player.getLocation().getDirection().multiply(.5)).add(direction.multiply(-.25)).setY(.65);
+            delay = 5;
+        }
 
         WallRun.stopWallRunning(player);
-        player.setVelocity(wallJump);
-        player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
-        Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Wall Jump"));
 
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                startLongJumpTask(player);
-            }
-        }.runTaskLater(nmlAcrobatics, 10);
+        if (profileManager.getPlayerProfile(player.getUniqueId()).getStats().getCurrentEnergy() > 10) {
+            player.setVelocity(wallJump);
+            player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
+            Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Wall Jump"));
+            EnergyManager.useEnergy(player, 7);
+
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    startLongJumpTask(player);
+                }
+            }.runTaskLater(nmlAcrobatics, delay);
+        }
     }
 
     public static void startLongJumpTask(Player player) {
@@ -64,6 +80,7 @@ public class LongJump {
 
             @Override
             public void run() {
+                if (player.isInWater() || player.isInLava() || player.isInPowderedSnow()) cancel();
                 if (acrobaticsLevel >= 30 && !RailGrind.isRailGrinding(player) && WallRun.getClosetWallCardinal(player) != null) {
                     WallRun.startWallRunning(player, WallRun.getClosetWallCardinal(player));
                     cancel();
@@ -72,50 +89,10 @@ public class LongJump {
                 if (player.isOnGround()) { // rail grind logic
                     cancel();
 
-                    if (acrobaticsLevel >= 20 && RailGrind.isGrindable(RailGrind.getBottomBlock(player))) RailGrind.startRailGrind(player);
+                    if (acrobaticsLevel >= 20 && RailGrind.isGrindable(RailGrind.getBottomBlock(player))) {
+                        RailGrind.startRailGrind(player);
+                    }
                 }
-//                else { // climbing logic
-//                    int acrobaticsLvl = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
-//
-//                    if (acrobaticsLvl >= 30) {
-//                        Vector playerDir = player.getLocation().getDirection().clone().setY(0);
-//
-//                        if (playerDir.lengthSquared() < 1e-6) {
-//                            double yawRad = Math.toRadians(player.getLocation().getYaw());
-//                            playerDir = new Vector(-Math.sin(yawRad), 0, Math.cos(yawRad));
-//                        }
-//
-//                        Vector forward = playerDir.clone().normalize().multiply(1.2);
-//                        Vector right = playerDir.clone().crossProduct(new Vector(0, 1, 0)).setY(0).normalize();
-//                        Vector left = right.clone().multiply(-1);
-//                        Location leftLoc = player.getLocation().clone().add(left);
-//                        Location forwardLoc = player.getLocation().clone().add(forward);
-//                        Location rightLoc = player.getLocation().clone().add(right);
-//
-//                        Block leftTop = leftLoc.clone().add(0, 1, 0).getBlock();
-//                        Block leftBottom = leftLoc.getBlock();
-//                        Block forwardTop = forwardLoc.clone().add(0, 1, 0).getBlock();
-//                        Block forwardBottom = forwardLoc.getBlock();
-//                        Block rightTop = rightLoc.clone().add(0, 1, 0).getBlock();
-//                        Block rightBottom = rightLoc.getBlock();
-//
-//                        if (leftTop.isSolid() && leftBottom.isSolid()) {
-//                            startWallRun(player, snapToCardinal(left));
-//                            player.removeMetadata("long jump", nmlAcrobatics);
-//                            cancel();
-//                        }
-//                        else if (forwardTop.isSolid() && forwardBottom.isSolid()) {
-//                            startWallRun(player, snapToCardinal(forward));
-//                            player.removeMetadata("long jump", nmlAcrobatics);
-//                            cancel();
-//                        }
-//                        else if (rightTop.isSolid() && rightBottom.isSolid()) {
-//                            startWallRun(player, snapToCardinal(right));
-//                            player.removeMetadata("long jump", nmlAcrobatics);
-//                            cancel();
-//                        }
-//                    }
-//                }
             }
         }.runTaskTimer(nmlAcrobatics, 0, 1);
     }
