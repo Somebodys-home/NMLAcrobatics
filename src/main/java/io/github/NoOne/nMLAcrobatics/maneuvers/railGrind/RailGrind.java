@@ -24,7 +24,7 @@ public class RailGrind {
     private static HashMap<UUID, Float> playerWalkSpeeds = new HashMap<>(); // we set the players movement speed to 0 when rail grinding, so make sure to save the value it was before
     private static HashMap<UUID, Block> pivotedBlocks = new HashMap<>(); // stores the blocks that a player previously turned on
     private static HashMap<UUID, Block> heightBlocks = new HashMap<>(); // stores the blocks that a player previously changed their height on
-    private static HashMap<UUID, Integer> soundTimers = new HashMap<>(); // stores the blocks that a player previously changed their height on
+    private static HashMap<UUID, Integer> effectTimers = new HashMap<>(); // stores a timer for making the players effects when rail grinding
     private static Sound railGrindSound = Sound.BLOCK_GRINDSTONE_USE;
     private static Sound pingSound = Sound.ITEM_TRIDENT_RETURN;
 
@@ -52,6 +52,8 @@ public class RailGrind {
                     Block forwardsBlock = forwardsBottomBlock.getRelative(BlockFace.UP);
                     boolean aboutToFall = !isGrindable(forwardsBottomBlock) && !isGrindable(forwardsBottomBottomBlock);
                     boolean aboutToHitWall = getIncomingWall(player, cardinal).isSolid();
+
+                    aboutToFallCheck(player);
 
                     // turning logic
                     if (!aboutToFall && !aboutToHitWall) { // if you can still go forwards, then check if you can turn based on where the player is looking
@@ -103,22 +105,26 @@ public class RailGrind {
         }.runTaskTimer(nmlAcrobatics, 0, 1);
     }
 
-    public static void startSoundTask() {
+    public static void startEffectsTask() {
         new BukkitRunnable() {
             @Override
             public void run() {
                 int timer = 230;
 
-                for (Map.Entry<UUID, Integer> entry : soundTimers.entrySet()) {
+                for (Map.Entry<UUID, Integer> entry : effectTimers.entrySet()) {
                     Player player = Bukkit.getPlayer(entry.getKey());
+                    Location playerLocation = player.getLocation();
                     int timeLeft = entry.getValue();
+                    Vector direction = railGrindDirections.get(player.getUniqueId());
 
-                    if (timeLeft % 5 == 0) player.playSound(player.getLocation(), railGrindSound, .33f, .33f);
+                    player.getWorld().spawnParticle(Particle.BLOCK, playerLocation, 10, direction.getX() * .25, .25, direction.getZ() * .25, getBottomBlock(player).getBlockData());
+
+                    if (timeLeft % 5 == 0) player.playSound(playerLocation, railGrindSound, .33f, .33f);
                     if (timeLeft == 0) {
-                        soundTimers.put(player.getUniqueId(), timer);
-                        player.playSound(player.getLocation(), Sound.ENTITY_MINECART_INSIDE, .6f, .5f);
+                        effectTimers.put(player.getUniqueId(), timer);
+                        player.playSound(playerLocation, Sound.ENTITY_MINECART_INSIDE, .6f, .5f);
                     } else {
-                        soundTimers.put(player.getUniqueId(), timeLeft - 1);
+                        effectTimers.put(player.getUniqueId(), timeLeft - 1);
                     }
                 }
             }
@@ -132,7 +138,7 @@ public class RailGrind {
 
         railGrindDirections.put(uuid, player.getFacing().getDirection());
         playerWalkSpeeds.put(uuid, player.getWalkSpeed());
-        railGrindSpeeds.put(uuid, Speedometer.getSpeedPerSecond(player));
+        railGrindSpeeds.put(uuid, Speedometer.getSpeedPerTick(player));
         centerPlayerOnBlock(player);
         player.setWalkSpeed(0);
         startPlayingSound(player);
@@ -232,11 +238,11 @@ public class RailGrind {
     }
 
     private static void startPlayingSound(Player player) {
-        soundTimers.put(player.getUniqueId(), 0);
+        effectTimers.put(player.getUniqueId(), 0);
     }
 
     private static void stopPlayingSound(Player player) {
-        soundTimers.remove(player.getUniqueId());
+        effectTimers.remove(player.getUniqueId());
         player.stopSound(railGrindSound);
         player.stopSound(Sound.ENTITY_MINECART_INSIDE);
     }
@@ -248,11 +254,36 @@ public class RailGrind {
         new BukkitRunnable() {
             @Override
             public void run() {
-                if (!soundTimers.containsKey(player.getUniqueId()) && isRailGrinding(player)) {
+                if (!effectTimers.containsKey(player.getUniqueId()) && isRailGrinding(player)) {
                     startPlayingSound(player);
                 }
             }
         }.runTaskLater(nmlAcrobatics, 5);
+    }
+
+    public static boolean aboutToFallCheck(Player player) {
+        double speed = Speedometer.getSpeedPerTick(player); // need to get the players effective speed not the speed they started at in the hashmap
+        Vector direction = railGrindDirections.get(player.getUniqueId());
+
+        if (speed > 1) {
+            direction = direction.clone().multiply(speed);
+        }
+
+        World world = player.getWorld();
+        Block bottomBlock = getBottomBlock(player);
+        Block forwardsBottomBlock = world.getBlockAt(bottomBlock.getLocation().add(direction));
+//        Block forwardsBottomBottomBlock = forwardsBottomBlock.getRelative(BlockFace.DOWN);
+//        Block forwardsBlock = forwardsBottomBlock.getRelative(BlockFace.UP);
+//        boolean aboutToFall = !isGrindable(forwardsBottomBlock) && !isGrindable(forwardsBottomBottomBlock);
+
+        player.sendMessage("speed: " + speed);
+        player.sendMessage("bottom block: " + bottomBlock.getType());
+        player.sendMessage("forwards bottom block: " + forwardsBottomBlock.getType());
+        player.spawnParticle(Particle.FLAME, bottomBlock.getLocation().add(direction), 1, 0, 0, 0, 0);
+        if (tooCloseToTurn(player) || tooCloseToStep(player)) {
+            return false;
+        }
+        return false;
     }
 
     public static boolean isGrindable(Block block) {
@@ -286,18 +317,18 @@ public class RailGrind {
     }
 
     private static Vector getRailGrindVelocity(Player player) {
-        double multiplier = Math.max((railGrindSpeeds.get(player.getUniqueId()) / 20) * 1.2, .65); // 1x speed multiplier = 20 m/s
+        double speed = Math.max(railGrindSpeeds.get(player.getUniqueId()) * 1.2, .65); // 1x speed multiplier = 20 m/s
 
         // if the player just turned / scaled, then massively lower their speed until they're a block away from where they did it from
         if (tooCloseToTurn(player) || tooCloseToStep(player)) {
-            if (multiplier <= 1 && multiplier > .1) {
-                multiplier = .1;
+            if (speed <= 1 && speed > .1) {
+                speed = .1;
             } else {
-                multiplier = .2;
+                speed = .2;
             }
         }
 
-        return railGrindDirections.get(player.getUniqueId()).clone().multiply(multiplier);
+        return railGrindDirections.get(player.getUniqueId()).clone().multiply(.25);
     }
 
     public static Block getBottomBlock(Player player) {
