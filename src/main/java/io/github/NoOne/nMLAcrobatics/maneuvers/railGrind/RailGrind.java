@@ -20,7 +20,7 @@ import java.util.UUID;
 public class RailGrind {
     private static NMLAcrobatics nmlAcrobatics = NMLAcrobatics.getInstance();
     private static HashMap<UUID, Vector> railGrindDirections = new HashMap<>(); // the cardinal direction that the player is grinding in
-    private static HashMap<UUID, Double> railGrindSpeeds = new HashMap<>(); // the speed that the player is grinding at
+    private static HashMap<UUID, Double> railGrindSpeeds = new HashMap<>(); // the speed that the player started/will br grinding at
     private static HashMap<UUID, Float> playerWalkSpeeds = new HashMap<>(); // we set the players movement speed to 0 when rail grinding, so make sure to save the value it was before
     private static HashMap<UUID, Block> pivotedBlocks = new HashMap<>(); // stores the blocks that a player previously turned on
     private static HashMap<UUID, Block> heightBlocks = new HashMap<>(); // stores the blocks that a player previously changed their height on
@@ -32,30 +32,37 @@ public class RailGrind {
         new BukkitRunnable() {
             @Override
             public void run() {
-
                 for (Player player : Bukkit.getOnlinePlayers()) {
                     if (!isRailGrinding(player)) continue;
-                    if (!isGrindable(getBottomBlock(player))) { // player has fallen off the rail :T
-                        stopRailGrind(player);
-                        startFellOffRailTask(player);
-
-                        continue;
-                    }
 
                     World world = player.getWorld();
                     Vector direction = railGrindDirections.get(player.getUniqueId());
                     BlockFace cardinal = convertVectorToCardinal(direction);
-
                     Block bottomBlock = getBottomBlock(player);
-                    Block forwardsBottomBlock = bottomBlock.getRelative(cardinal);
+                    Block forwardsBottomBlock = bottomBlock.getRelative(cardinal, (int) Math.round(getEffectiveRailGrindSpeed(player)));
                     Block forwardsBottomBottomBlock = forwardsBottomBlock.getRelative(BlockFace.DOWN);
-                    Block forwardsBlock = forwardsBottomBlock.getRelative(BlockFace.UP);
                     boolean aboutToFall = !isGrindable(forwardsBottomBlock) && !isGrindable(forwardsBottomBottomBlock);
                     boolean aboutToHitWall = getIncomingWall(player, cardinal).isSolid();
 
-                    aboutToFallCheck(player);
+                    if (!isGrindable(bottomBlock)) { // player has fallen off the rail :T
+                        stopRailGrind(player);
+                        startFellOffRailTask(player);
+                        continue;
+                    }
 
                     // turning logic
+                    // todo: this turning logic is bugged at high speeds
+                    //  see the distance that you get the block in front of the player by scales with your speed per tick
+                    //  ex if you were moving 1.5 blocks a tick, then the block that is in front of you is whatever block is 1.5 blocks away in the direction youre rail grinding in
+                    //  the problem with that is how minecraft calculates what your block position is
+                    //  because it takes the integer value of your coordinates only
+                    //  so like if the x position of your coords was like 5.235 or something, the x coord of your block position would be 5~~.235~~
+                    //  so for railgrinding, if youre going at a speed over a block a tick, and you approach a turn at the very end of one block but not quite at the start of a new one,
+                    //  then the check regonizes that youre reaching a dead end
+                    //  but fails in determining where you should turn to because the block that it gets below you is actually a block behind where you are
+                    //  and by the time the railgrinding system regonizes that and tries to course correct on the next tick
+                    //  youve already fallen off the rail
+                    //  and i think how to fix it is if the player is maybe 3/4ths of the way past the block, then check the block in front of the player for turns instead
                     if (!aboutToFall && !aboutToHitWall) { // if you can still go forwards, then check if you can turn based on where the player is looking
                         if (player.getFacing() != cardinal) {
                             priorityCardinalTurn(player, cardinal);
@@ -63,12 +70,13 @@ public class RailGrind {
                     } else { // if you cant go forwards, then turn logic is based on how many ways you can turn
                         BlockFace leftCardinal = getLeftCardinal(cardinal);
                         BlockFace rightCardinal = getRightCardinal(cardinal);
-                        boolean canTurnLeft = isTurningDirectionValid(player, leftCardinal);
-                        boolean canTurnRight = isTurningDirectionValid(player, rightCardinal);
+                        boolean canTurnLeft = isTurningDirectionValid(player, leftCardinal, bottomBlock);
+                        boolean canTurnRight = isTurningDirectionValid(player, rightCardinal, bottomBlock);
+                        // todo: so like here, instead of bottomblock if youre like 3/4th through the block youre on, it gets the block in front of you
 
                         if (canTurnLeft && canTurnRight) { // if you can turn both ways, then turn based on where the player is looking
                             priorityCardinalTurn(player, cardinal);
-                        } else if (canTurnLeft) { // if you cant then just turn right or left
+                        } else if (canTurnLeft) {
                             turnPlayer(player, leftCardinal);
                         } else if (canTurnRight) {
                             turnPlayer(player, getRightCardinal(cardinal));
@@ -76,6 +84,8 @@ public class RailGrind {
                     }
 
                     // scaling logic
+                    Block forwardsBlock = forwardsBottomBlock.getRelative(BlockFace.UP);
+
                     if (isGrindable(forwardsBlock)) {
                         scaleBlock(player, forwardsBlock);
                     } else if (isGrindable(forwardsBottomBottomBlock) && !isGrindable(forwardsBottomBlock)) {
@@ -225,12 +235,12 @@ public class RailGrind {
         }
 
         if (priorityCardinal != null) { // if the player isnt looking a proper way fall off then, nerd
-            if (isTurningDirectionValid(player, priorityCardinal)) {
+            if (isTurningDirectionValid(player, priorityCardinal, getBottomBlock(player))) {
                 turnPlayer(player, priorityCardinal);
             } else { // if not, repeat that same check to the opposite cardinal block
                 BlockFace oppositeCardinal = priorityCardinal.getOppositeFace();
 
-                if (isTurningDirectionValid(player, oppositeCardinal)) {
+                if (isTurningDirectionValid(player, oppositeCardinal, getBottomBlock(player))) {
                     turnPlayer(player, oppositeCardinal);
                 }
             }
@@ -261,31 +271,6 @@ public class RailGrind {
         }.runTaskLater(nmlAcrobatics, 5);
     }
 
-    public static boolean aboutToFallCheck(Player player) {
-        double speed = Speedometer.getSpeedPerTick(player); // need to get the players effective speed not the speed they started at in the hashmap
-        Vector direction = railGrindDirections.get(player.getUniqueId());
-
-        if (speed > 1) {
-            direction = direction.clone().multiply(speed);
-        }
-
-        World world = player.getWorld();
-        Block bottomBlock = getBottomBlock(player);
-        Block forwardsBottomBlock = world.getBlockAt(bottomBlock.getLocation().add(direction));
-//        Block forwardsBottomBottomBlock = forwardsBottomBlock.getRelative(BlockFace.DOWN);
-//        Block forwardsBlock = forwardsBottomBlock.getRelative(BlockFace.UP);
-//        boolean aboutToFall = !isGrindable(forwardsBottomBlock) && !isGrindable(forwardsBottomBottomBlock);
-
-        player.sendMessage("speed: " + speed);
-        player.sendMessage("bottom block: " + bottomBlock.getType());
-        player.sendMessage("forwards bottom block: " + forwardsBottomBlock.getType());
-        player.spawnParticle(Particle.FLAME, bottomBlock.getLocation().add(direction), 1, 0, 0, 0, 0);
-        if (tooCloseToTurn(player) || tooCloseToStep(player)) {
-            return false;
-        }
-        return false;
-    }
-
     public static boolean isGrindable(Block block) {
         String blockType = block.getType().name();
 
@@ -296,14 +281,15 @@ public class RailGrind {
         return player.hasMetadata("rail grind");
     }
 
-    private static boolean isTurningDirectionValid(Player player, BlockFace cardinal) {
-        Block bottomBlock = getBottomBlock(player);
-        Block frontBottomBlock = bottomBlock.getRelative(cardinal);
-        Block frontBottomTopBlock = frontBottomBlock.getRelative(BlockFace.UP);
+    // returns if, for a given cardinal direction:
+    // the first block in that direction is grindable, and there's no wall there
+    private static boolean isTurningDirectionValid(Player player, BlockFace cardinal, Block block) {
+        Block frontBottomBlock = player.getWorld().getBlockAt(block.getLocation().add(cardinal.getDirection()));
+        Block frontBlock = frontBottomBlock.getRelative(BlockFace.UP);
         Block frontBottomBottomBlock = frontBottomBlock.getRelative(BlockFace.DOWN);
         Block incomingWall = getIncomingWall(player, cardinal);
 
-        return (isGrindable(frontBottomBlock) || isGrindable(frontBottomBottomBlock) || isGrindable(frontBottomTopBlock)) && !incomingWall.isSolid();
+        return (isGrindable(frontBottomBlock) || isGrindable(frontBottomBottomBlock) || isGrindable(frontBlock)) && !incomingWall.isSolid();
     }
 
     // returns t/f if the player has moved from the block they previously turned on to be able to turn again
@@ -316,19 +302,17 @@ public class RailGrind {
         return getBottomBlock(player).equals(heightBlocks.get(player.getUniqueId()));
     }
 
-    private static Vector getRailGrindVelocity(Player player) {
-        double speed = Math.max(railGrindSpeeds.get(player.getUniqueId()) * 1.2, .65); // 1x speed multiplier = 20 m/s
-
+    private static double getEffectiveRailGrindSpeed(Player player) {
         // if the player just turned / scaled, then massively lower their speed until they're a block away from where they did it from
         if (tooCloseToTurn(player) || tooCloseToStep(player)) {
-            if (speed <= 1 && speed > .1) {
-                speed = .1;
-            } else {
-                speed = .2;
-            }
+            return .1;
+        } else {
+            return Math.max(railGrindSpeeds.get(player.getUniqueId()) * 1.2, .65); // 1x speed multiplier = 20 m/s
         }
+    }
 
-        return railGrindDirections.get(player.getUniqueId()).clone().multiply(.25);
+    private static Vector getRailGrindVelocity(Player player) {
+        return railGrindDirections.get(player.getUniqueId()).clone().multiply(getEffectiveRailGrindSpeed(player));
     }
 
     public static Block getBottomBlock(Player player) {
