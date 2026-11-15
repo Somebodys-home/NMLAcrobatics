@@ -6,6 +6,7 @@ import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrind;
 import io.github.NoOne.nMLAcrobatics.maneuvers.wallRun.WallRun;
 import io.github.NoOne.nMLEnergy.EnergyManager;
 import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
+import io.github.NoOne.nMLPlayerStats.statSystem.PlayerStat;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -17,7 +18,7 @@ public class LongJump {
     private static ProfileManager profileManager = NMLAcrobatics.getInstance().getProfileManager();
 
     public static void longJump(Player player) {
-        double speedMultiplier = nmlAcrobatics.getProfileManager().getPlayerProfile(player.getUniqueId()).getStats().getSpeed() / 100.0;
+        double speedMultiplier = nmlAcrobatics.getProfileManager().getStats(player.getUniqueId()).getIntStatValue(PlayerStat.SPEED) / 100.0;
         Vector longJump = player.getLocation().getDirection().multiply(.9).multiply(speedMultiplier).setY(.5);
 
         player.setVelocity(longJump);
@@ -59,7 +60,7 @@ public class LongJump {
 
         WallRun.stopWallRunning(player);
 
-        if (profileManager.getPlayerProfile(player.getUniqueId()).getStats().getCurrentEnergy() > 10) {
+        if (profileManager.getStats(player.getUniqueId()).getStatValue(PlayerStat.CURRENT_ENERGY) > 10) {
             player.setVelocity(wallJump);
             player.playSound(player, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1f, 1f);
             Bukkit.getPluginManager().callEvent(new PerformedManeuverEvent(player, "Wall Jump"));

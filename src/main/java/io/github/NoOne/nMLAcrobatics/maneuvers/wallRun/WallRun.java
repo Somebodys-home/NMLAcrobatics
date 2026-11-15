@@ -6,6 +6,7 @@ import io.github.NoOne.nMLAcrobatics.Speedometer;
 import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrind;
 import io.github.NoOne.nMLEnergy.EnergyManager;
 import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
+import io.github.NoOne.nMLPlayerStats.statSystem.PlayerStat;
 import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
 import org.bukkit.*;
 import org.bukkit.block.Block;
@@ -91,9 +92,9 @@ public class WallRun {
                     }
 
                     // energy use
-                    Stats stats = profileManager.getPlayerProfile(uuid).getStats();
+                    Stats stats = profileManager.getStats(uuid);
 
-                    if (stats.getCurrentEnergy() < 5) {
+                    if (stats.getStatValue(PlayerStat.CURRENT_ENERGY) < 5) {
                         stopWallRunning(player);
                     } else {
                         EnergyManager.useEnergy(player, .25); // 5 energy/s

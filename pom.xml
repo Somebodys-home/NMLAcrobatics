@@ -91,13 +91,13 @@
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLEnergy</artifactId>
-            <version>87d9031c8c</version>
+            <version>728a0c1446</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.github.Somebodys-home</groupId>
             <artifactId>NMLPlayerStats</artifactId>
-            <version>8ee70576fd</version>
+            <version>610edb810d</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

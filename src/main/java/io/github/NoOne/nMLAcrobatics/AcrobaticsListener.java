@@ -3,6 +3,7 @@ package io.github.NoOne.nMLAcrobatics;
 import io.github.NoOne.nMLAcrobatics.maneuvers.PerformedManeuverEvent;
 import io.github.NoOne.nMLAcrobatics.maneuvers.roll.Roll;
 import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
+import io.github.NoOne.nMLPlayerStats.statSystem.PlayerStat;
 import io.github.NoOne.nMLPlayerStats.statSystem.StatChangeEvent;
 import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
 import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
@@ -38,7 +39,7 @@ public class AcrobaticsListener implements Listener {
         if (event.getChange() > 0 && event.getSkill().equals("acrobatics")) {
             Player player = event.getPlayer();
             Skills skills = skillSetManager.getSkillSet(player.getUniqueId()).getSkills();
-            Stats stats = profileManager.getPlayerProfile(player.getUniqueId()).getStats();
+            Stats stats = profileManager.getStats(player.getUniqueId());
             int change = (int) event.getChange();
             int prevLevel = Math.max(skills.getAcrobaticsLevel() - change, 1);
             int newLevel = skills.getAcrobaticsLevel();
@@ -87,8 +88,8 @@ public class AcrobaticsListener implements Listener {
                 }
 
                 player.sendMessage("§7§lREWARDS:");
-                player.sendMessage("§8" + stats.getSpeed() + " -> §r§f" + (stats.getSpeed() + speedChange) + " §r§fSpeed ✦ §r§b(+" + speedChange + ")");
-                Bukkit.getPluginManager().callEvent(new StatChangeEvent(player, "speed", speedChange));
+                player.sendMessage("§8" + stats.getIntStatValue(PlayerStat.SPEED) + " -> §r§f" + (stats.getIntStatValue(PlayerStat.SPEED)+ speedChange) + " §r§fSpeed ✦ §r§b(+" + speedChange + ")");
+                Bukkit.getPluginManager().callEvent(new StatChangeEvent(player, PlayerStat.SPEED, speedChange));
             }
 
             player.sendMessage("§f§l---------------------------");
