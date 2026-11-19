@@ -6,7 +6,8 @@ import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
 import io.github.NoOne.nMLPlayerStats.statSystem.PlayerStat;
 import io.github.NoOne.nMLPlayerStats.statSystem.StatChangeEvent;
 import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
-import io.github.NoOne.nMLSkills.skillSetSystem.SkillSetManager;
+import io.github.NoOne.nMLSkills.saveSkillsSystem.SaveSkillsManager;
+import io.github.NoOne.nMLSkills.skillSystem.Skill;
 import io.github.NoOne.nMLSkills.skillSystem.SkillChangeEvent;
 import io.github.NoOne.nMLSkills.skillSystem.Skills;
 import org.bukkit.Bukkit;
@@ -25,24 +26,24 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 public class AcrobaticsListener implements Listener {
     private NMLAcrobatics nmlAcrobatics;
-    private SkillSetManager skillSetManager;
+    private SaveSkillsManager saveSkillsManager;
     private ProfileManager profileManager;
 
     public AcrobaticsListener(NMLAcrobatics nmlAcrobatics) {
         this.nmlAcrobatics = nmlAcrobatics;
-        skillSetManager = nmlAcrobatics.getSkillSetManager();
+        saveSkillsManager = nmlAcrobatics.getSaveSkillsManager();
         profileManager = nmlAcrobatics.getProfileManager();
     }
 
     @EventHandler
     public void acrobaticsSkillLevelUp(SkillChangeEvent event) {
-        if (event.getChange() > 0 && event.getSkill().equals("acrobatics")) {
+        if (event.getChange() > 0 && event.getSkill().equals(Skill.ACROBATICS) && !event.isExpChange()) {
             Player player = event.getPlayer();
-            Skills skills = skillSetManager.getSkillSet(player.getUniqueId()).getSkills();
+            Skills skills = saveSkillsManager.getSkills(player.getUniqueId());
             Stats stats = profileManager.getStats(player.getUniqueId());
-            int change = (int) event.getChange();
-            int prevLevel = Math.max(skills.getAcrobaticsLevel() - change, 1);
-            int newLevel = skills.getAcrobaticsLevel();
+            int change = event.getChange();
+            int prevLevel = Math.max(skills.getSkillLevel(Skill.ACROBATICS) - change, 1);
+            int newLevel = skills.getSkillLevel(Skill.ACROBATICS);
 
             player.playSound(player, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
 

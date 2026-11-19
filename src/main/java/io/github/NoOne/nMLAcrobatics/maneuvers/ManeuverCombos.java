@@ -1,7 +1,7 @@
 package io.github.NoOne.nMLAcrobatics.maneuvers;
 
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
-import io.github.NoOne.nMLSkills.skillSystem.SkillBars;
+import io.github.NoOne.nMLSkills.skillSystem.Skill;
 import io.github.NoOne.nMLSkills.skillSystem.SkillChangeEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
@@ -207,7 +207,7 @@ public class ManeuverCombos {
         new BukkitRunnable() {
             @Override
             public void run() {
-                Bukkit.getPluginManager().callEvent(new SkillChangeEvent(player, "acrobaticsexp", finalExpGain, ticks));
+                Bukkit.getPluginManager().callEvent(new SkillChangeEvent(player, Skill.ACROBATICS, true, finalExpGain, ticks));
             }
         }.runTaskLater(nmlAcrobatics, 15L);
 

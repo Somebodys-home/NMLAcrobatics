@@ -7,6 +7,7 @@ import io.github.NoOne.nMLAcrobatics.maneuvers.wallRun.WallRun;
 import io.github.NoOne.nMLEnergy.EnergyManager;
 import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
 import io.github.NoOne.nMLPlayerStats.statSystem.PlayerStat;
+import io.github.NoOne.nMLSkills.skillSystem.Skill;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
@@ -77,7 +78,7 @@ public class LongJump {
 
     public static void startLongJumpTask(Player player) {
         new BukkitRunnable() {
-            int acrobaticsLevel = nmlAcrobatics.getSkillSetManager().getSkillSet(player.getUniqueId()).getSkills().getAcrobaticsLevel();
+            int acrobaticsLevel = nmlAcrobatics.getSaveSkillsManager().getSkills(player.getUniqueId()).getSkillLevel(Skill.ACROBATICS);
 
             @Override
             public void run() {
