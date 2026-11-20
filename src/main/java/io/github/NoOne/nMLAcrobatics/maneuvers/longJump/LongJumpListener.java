@@ -2,7 +2,7 @@ package io.github.NoOne.nMLAcrobatics.maneuvers.longJump;
 
 import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
-import io.github.NoOne.nMLSkills.saveSkillsSystem.SaveSkillsManager;
+import io.github.NoOne.nMLSkills.SaveSkillsManager;
 import io.github.NoOne.nMLSkills.skillSystem.Skill;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
