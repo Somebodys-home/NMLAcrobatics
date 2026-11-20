@@ -2,7 +2,7 @@ package io.github.NoOne.nMLAcrobatics;
 
 import io.github.NoOne.nMLAcrobatics.maneuvers.PerformedManeuverEvent;
 import io.github.NoOne.nMLAcrobatics.maneuvers.roll.Roll;
-import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
+import io.github.NoOne.nMLPlayerStats.StatConfigManager;
 import io.github.NoOne.nMLPlayerStats.statSystem.PlayerStat;
 import io.github.NoOne.nMLPlayerStats.statSystem.StatChangeEvent;
 import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
@@ -27,12 +27,12 @@ import org.bukkit.scheduler.BukkitRunnable;
 public class AcrobaticsListener implements Listener {
     private NMLAcrobatics nmlAcrobatics;
     private SaveSkillsManager saveSkillsManager;
-    private ProfileManager profileManager;
+    private StatConfigManager statConfigManager;
 
     public AcrobaticsListener(NMLAcrobatics nmlAcrobatics) {
         this.nmlAcrobatics = nmlAcrobatics;
         saveSkillsManager = nmlAcrobatics.getSaveSkillsManager();
-        profileManager = nmlAcrobatics.getProfileManager();
+        statConfigManager = nmlAcrobatics.getStatConfigManager();
     }
 
     @EventHandler
@@ -40,7 +40,7 @@ public class AcrobaticsListener implements Listener {
         if (event.getChange() > 0 && event.getSkill().equals(Skill.ACROBATICS) && !event.isExpChange()) {
             Player player = event.getPlayer();
             Skills skills = saveSkillsManager.getSkills(player.getUniqueId());
-            Stats stats = profileManager.getStats(player.getUniqueId());
+            Stats stats = statConfigManager.getStats(player.getUniqueId());
             int change = event.getChange();
             int prevLevel = Math.max(skills.getSkillLevel(Skill.ACROBATICS) - change, 1);
             int newLevel = skills.getSkillLevel(Skill.ACROBATICS);

@@ -8,7 +8,7 @@ import io.github.NoOne.nMLAcrobatics.maneuvers.roll.RollListener;
 import io.github.NoOne.nMLAcrobatics.maneuvers.wallRun.WallRun;
 import io.github.NoOne.nMLAcrobatics.maneuvers.wallRun.WallRunListener;
 import io.github.NoOne.nMLPlayerStats.NMLPlayerStats;
-import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
+import io.github.NoOne.nMLPlayerStats.StatConfigManager;
 import io.github.NoOne.nMLSkills.NMLSkills;
 import io.github.NoOne.nMLSkills.SaveSkillsManager;
 import org.bukkit.Bukkit;
@@ -17,14 +17,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class NMLAcrobatics extends JavaPlugin {
     private static NMLAcrobatics instance;
-    private ProfileManager profileManager;
+    private StatConfigManager statConfigManager;
     private SaveSkillsManager saveSkillsManager;
     private ManeuverCombos maneuverCombos;
 
     @Override
     public void onEnable() {
         instance = this;
-        profileManager = JavaPlugin.getPlugin(NMLPlayerStats.class).getProfileManager();
+        statConfigManager = JavaPlugin.getPlugin(NMLPlayerStats.class).getStatConfigManager();
         saveSkillsManager = JavaPlugin.getPlugin(NMLSkills.class).getSaveSkillsManager();
         maneuverCombos = new ManeuverCombos(this);
 
@@ -57,8 +57,8 @@ public class NMLAcrobatics extends JavaPlugin {
         return saveSkillsManager;
     }
 
-    public ProfileManager getProfileManager() {
-        return profileManager;
+    public StatConfigManager getStatConfigManager() {
+        return statConfigManager;
     }
 
     public ManeuverCombos getManeuverCombos() {

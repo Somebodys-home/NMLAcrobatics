@@ -5,7 +5,7 @@ import io.github.NoOne.nMLAcrobatics.NMLAcrobatics;
 import io.github.NoOne.nMLAcrobatics.Speedometer;
 import io.github.NoOne.nMLAcrobatics.maneuvers.railGrind.RailGrind;
 import io.github.NoOne.nMLEnergy.EnergyManager;
-import io.github.NoOne.nMLPlayerStats.profileSystem.ProfileManager;
+import io.github.NoOne.nMLPlayerStats.StatConfigManager;
 import io.github.NoOne.nMLPlayerStats.statSystem.PlayerStat;
 import io.github.NoOne.nMLPlayerStats.statSystem.Stats;
 import org.bukkit.*;
@@ -23,7 +23,7 @@ import java.util.UUID;
 
 public class WallRun {
     private static NMLAcrobatics nmlAcrobatics = NMLAcrobatics.getInstance();
-    private static ProfileManager profileManager = NMLAcrobatics.getInstance().getProfileManager();
+    private static StatConfigManager statConfigManager = NMLAcrobatics.getInstance().getStatConfigManager();
     private static HashMap<UUID, Vector> wallRunDirections = new HashMap<>(); // the cardinal direction that the player is wall running in
     private static HashMap<UUID, Double> wallRunSpeeds = new HashMap<>(); // the speeds that the players started wall running in
     private static HashMap<UUID, Integer> wallRunTimes = new HashMap<>(); // the amount of time that you spend wall running
@@ -92,7 +92,7 @@ public class WallRun {
                     }
 
                     // energy use
-                    Stats stats = profileManager.getStats(uuid);
+                    Stats stats = statConfigManager.getStats(uuid);
 
                     if (stats.getStatValue(PlayerStat.CURRENT_ENERGY) < 5) {
                         stopWallRunning(player);
